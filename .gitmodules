@@ -1,0 +1,3 @@
+[submodule "alator"]
+	path = alator
+	url = git@github.com:calumrussell/alator.git

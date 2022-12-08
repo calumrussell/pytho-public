@@ -1,0 +1,9 @@
+node_modules/
+dist/
+yarn.lock
+package-lock.json
+*.d.ts
+*.d.ts.gz
+*.d.ts.map
+*.d.ts.map.gz
+*.tsbuildinfo

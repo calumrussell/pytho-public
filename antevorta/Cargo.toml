@@ -1,0 +1,12 @@
+[package]
+name = "antevorta"
+version = "0.0.11"
+edition = "2021"
+
+[dependencies]
+alator = { "tag" = "v0.1.7", git = "ssh://git@github.com/calumrussell/alator-priv.git" }
+time = "0.3.11"
+rand = "0.8.4"
+rand_distr="0.4.1"
+serde_json="1.0.83"
+serde = { version = "1.0.143", features = ["derive"] }

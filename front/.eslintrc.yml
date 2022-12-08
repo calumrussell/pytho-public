@@ -1,0 +1,46 @@
+env:
+  browser: true
+  es2021: true
+ignorePatterns: ['**/*.d.ts']
+extends:
+  - 'plugin:react/recommended'
+  - 'google'
+parserOptions:
+  ecmaFeatures:
+    jsx: true
+  ecmaVersion: 12
+  sourceType: module
+plugins:
+  - 'react'
+rules: {
+  "object-curly-spacing": ["error", "always"],
+  "object-curly-newline": ["error", {minProperties: 1}],
+  "object-property-newline": ["error", {allowAllPropertiesOnSameLine: false}],
+  "array-bracket-newline": ["error", "always"],
+  "array-element-newline": ["error", {"minItems":1}],
+  "react/jsx-curly-spacing": [2, {when: "always", "spacing": {objectLiterals: "never"}}],
+  "react/jsx-closing-tag-location": [2],
+  "react/jsx-indent-props": [2, 2],
+  "react/jsx-indent": [2, 2, {checkAttributes: false, indentLogicalExpressions: true}],
+  "react/jsx-curly-newline": [2, {multiline: "require", singleline: "forbid"}],
+  "react/jsx-first-prop-new-line": [2, "always"],
+  "react/jsx-max-props-per-line": [2],
+  "react/jsx-one-expression-per-line": [2],
+  "react/jsx-props-no-multi-spaces": [2],
+  "react/jsx-tag-spacing": [2, beforeClosing: "never"],
+  "react/jsx-fragments": [2],
+  "react/jsx-equals-spacing": [2, "never"],
+}
+overrides:
+  - {
+      files: ['**/*.ts', '**/*.tsx'],
+      plugins: ['@typescript-eslint'],
+      extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+      parser: '@typescript-eslint/parser',
+      parserOptions: {
+        project: ['./tsconfig.json'],
+      },
+      rules: {
+        "@typescript-eslint/no-explicit-any": "off",
+      }
+  }

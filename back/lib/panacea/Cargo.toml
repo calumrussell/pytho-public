@@ -1,0 +1,19 @@
+[package]
+name = "panacea"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "panacea"
+crate-type = ["cdylib"]
+
+[dependencies]
+alator = { path = "alator" }
+antevorta = { path = "antevorta" }
+rand = "0.8.4"
+getrandom = { version = "0.2.8", features = ["js"] }
+rand_distr = "0.4.1"
+wasm-bindgen = "0.2.83"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
+web-sys = { version = "0.3.60", features = ["console"] }

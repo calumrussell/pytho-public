@@ -1,0 +1,14 @@
+version: '3.7'
+services:
+  postgres:
+    container_name: pythodb
+    image: postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PWD}
+      PGDATA: /pg
+    volumes:
+       - ./db:/pg
+    ports:
+      - "14102:5432"
+    restart: unless-stopped

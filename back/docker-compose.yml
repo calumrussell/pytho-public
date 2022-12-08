@@ -1,0 +1,8 @@
+version: "3.3"
+
+services:
+  pythoback:
+    container_name: pythoback
+    build: .
+    network_mode: host
+    env_file: .env

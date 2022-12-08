@@ -1,0 +1,48 @@
+html {
+  --default-text-color: #bebebe;
+  --alt-text-color: #989898;
+  --disabled-text-color: #606060;
+  --default-background-color: #282828;
+  --alt-background-color: #383838;
+  --off-background-color: #404040;
+  --highlight-background-color: #b8b8b8;
+  --img-background-color: #1e1e1e;
+  --default-font: "Open Sans";
+}
+
+body {
+  margin: 0;
+  background-color: var(--default-background-color);
+  color: var(--default-text-color);
+  margin: 0 auto;
+  max-width: 800px;
+  font-family: var(--default-font);
+}
+
+.site-header {
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.site-nav {
+  display: flex;
+  justify-content: space-between;
+}
+
+.site-nav span {
+  font-size: 1.5rem;
+}
+
+.site-nav span a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.post-title a {
+  text-decoration: underline;
+  color: inherit;
+}
+
+.dt-published {
+  color: var(--alt-text-color);
+}
