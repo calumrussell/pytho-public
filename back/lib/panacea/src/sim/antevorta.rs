@@ -8,7 +8,7 @@ use antevorta::input::FakeHashMapSourceSim;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
-use antevorta::country::uk::config::Config;
+use antevorta::country::uk::Config;
 use wasm_bindgen::JsValue;
 use std::collections::HashMap;
 use std::error::Error;
