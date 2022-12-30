@@ -1,7 +1,8 @@
 use alator::broker::Quote;
 use alator::clock::{Clock, ClockBuilder};
+use alator::exchange::DefaultExchangeBuilder;
 use alator::input::{HashMapInput, HashMapInputBuilder, QuotesHashMap};
-use alator::sim::broker::SimulatedBrokerBuilder;
+use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::input::FakeHashMapSourceSim;
 use antevorta::sim::SimRunner;
@@ -18,7 +19,7 @@ fn build_data(clock: Clock) -> HashMapInput {
     let mut fake_data: QuotesHashMap = HashMap::new();
     for date in clock.borrow().peek() {
         fake_data.insert(
-            date,
+            date.clone(),
             vec![Quote {
                 date,
                 bid: 10.0.into(),
@@ -43,14 +44,25 @@ fn build_data(clock: Clock) -> HashMapInput {
 #[test]
 fn sim_depositstrategy() {
     let sim_start: DateTime = 10.into();
-    let clock = ClockBuilder::from_length_days(&sim_start, 3).daily();
+    let clock = ClockBuilder::with_length_in_days(sim_start, 3)
+        .with_frequency(&alator::types::Frequency::Daily)
+        .build();
+
     let source = build_data(Rc::clone(&clock));
     let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
-    target_weights.insert("ABC", &1.0.into());
+    target_weights.insert("ABC", 1.0);
 
-    let brkr = SimulatedBrokerBuilder::new().with_data(source).build();
+    let exchange = DefaultExchangeBuilder::new()
+        .with_clock(Rc::clone(&clock))
+        .with_data_source(source.clone())
+        .build();
+
+    let brkr = SimulatedBrokerBuilder::new()
+        .with_exchange(exchange)
+        .with_data(source)
+        .build();
 
     let strat =
         StaticInvestmentStrategy::new(brkr, Schedule::EveryDay, target_weights, Rc::clone(&clock));

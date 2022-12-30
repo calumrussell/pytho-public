@@ -5,6 +5,7 @@ We do this here rather than in config because of the hard dependency on needing
 a complete config.
 */
 
+use alator::exchange::DefaultExchangeBuilder;
 use antevorta::country::uk::Config;
 use antevorta::input::{FakeHashMapSourceSim, HashMapSourceSim};
 use rand::thread_rng;
@@ -14,14 +15,17 @@ use std::collections::HashMap;
 use alator::broker::Quote;
 use alator::clock::{Clock, ClockBuilder};
 use alator::input::{HashMapInputBuilder, QuotesHashMap};
-use alator::sim::broker::SimulatedBrokerBuilder;
+use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use std::rc::Rc;
 
 fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
-    let clock = ClockBuilder::from_length_days(&(1.into()), 100).daily();
+    let clock = ClockBuilder::with_length_in_days(1, 100)
+        .with_frequency(&alator::types::Frequency::Daily)
+        .build();
+
     let mut rng = thread_rng();
     let ret_dist = Normal::new(0.02, 0.1).unwrap();
 
@@ -29,18 +33,18 @@ fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
     let mut price_abc = 100.0;
     let mut price_bcd = 100.0;
     for date in clock.borrow().peek() {
-        let q_abc = Quote {
-            symbol: "ABC".to_string(),
-            date: date.into(),
-            bid: price_abc.into(),
-            ask: price_abc.into(),
-        };
-        let q_bcd = Quote {
-            symbol: "BCD".to_string(),
-            date: date.into(),
-            bid: price_bcd.into(),
-            ask: price_bcd.into(),
-        };
+        let q_abc = Quote::new(
+            price_abc,
+            price_abc,
+            date.clone(),
+            "ABC"
+        );
+        let q_bcd = Quote::new(
+            price_bcd,
+            price_bcd,
+            date.clone(),
+            "BCD"
+        );
         fake_data.insert(date.into(), vec![q_abc, q_bcd]);
         price_abc += price_abc * (1.0 + ret_dist.sample(&mut rng));
         price_bcd += price_bcd * (1.0 + ret_dist.sample(&mut rng));
@@ -52,10 +56,18 @@ fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
     let sim_data = FakeHashMapSourceSim::get(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
-    target_weights.insert("ABC", &0.5.into());
-    target_weights.insert("BCD", &0.5.into());
+    target_weights.insert("ABC", 0.5);
+    target_weights.insert("BCD", 0.5);
 
-    let brkr = SimulatedBrokerBuilder::new().with_data(source).build();
+    let exchange = DefaultExchangeBuilder::new()
+        .with_data_source(source.clone())
+        .with_clock(Rc::clone(&clock))
+        .build();
+
+    let brkr = SimulatedBrokerBuilder::new()
+        .with_data(source)
+        .with_exchange(exchange)
+        .build();
 
     let strat = StaticInvestmentStrategy::new(
         brkr,

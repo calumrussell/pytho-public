@@ -1,8 +1,15 @@
 use alator::types::CashValue;
-use std::ops::Mul;
+use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TaxRate(f64);
+
+impl Deref for TaxRate {
+    type Target = f64;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl From<f64> for TaxRate {
     fn from(v: f64) -> Self {
@@ -16,47 +23,33 @@ impl From<TaxRate> for f64 {
     }
 }
 
-impl Mul<CashValue> for TaxRate {
-    type Output = CashValue;
-    fn mul(self, rhs: CashValue) -> Self::Output {
-        CashValue::from(self.0 * f64::from(rhs))
-    }
-}
-
-impl Mul<TaxRate> for CashValue {
-    type Output = Self;
-    fn mul(self, rhs: TaxRate) -> Self::Output {
-        CashValue::from(f64::from(self) * rhs.0)
-    }
-}
-
 pub trait Threshold {
     const MIN: CashValue;
     const MAX: CashValue;
     const RATE: TaxRate;
 
-    fn calc(total_income: &CashValue) -> CashValue {
-        let mut taxable_income = CashValue::default();
+    fn calc(total_income: &f64) -> CashValue {
+        let mut taxable_income = 0.0;
         if total_income > &Self::MIN {
             if total_income < &Self::MAX {
-                taxable_income = *total_income - Self::MIN;
+                taxable_income = *total_income - *Self::MIN;
             } else {
-                taxable_income = Self::MAX - Self::MIN;
+                taxable_income = *Self::MAX - *Self::MIN;
             }
         }
-        taxable_income * Self::RATE
+        CashValue::from(taxable_income * *Self::RATE)
     }
 }
 
 pub struct ThresholdCalculator;
 
 impl ThresholdCalculator {
-    pub fn calc(
-        min: CashValue,
-        max: CashValue,
+    pub fn calc<'a>(
+        min: &'a f64,
+        max: &'a f64,
         rate: TaxRate,
-    ) -> Box<dyn FnOnce(CashValue) -> CashValue + 'static> {
-        let func = move |income: CashValue| {
+    ) -> Box<dyn FnOnce(&f64) -> CashValue + 'a> {
+        let func = move |income: &f64| {
             let taxable_income;
             if income > min {
                 if income < max {
@@ -64,9 +57,9 @@ impl ThresholdCalculator {
                 } else {
                     taxable_income = max - min;
                 }
-                taxable_income * rate
+                CashValue::from(taxable_income * *rate)
             } else {
-                CashValue::default()
+                CashValue::from(0.0)
             }
         };
         Box::new(func)

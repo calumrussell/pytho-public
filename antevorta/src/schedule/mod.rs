@@ -6,7 +6,7 @@ type Day = i32;
 type Month = i32;
 type Year = i32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Schedule {
     EveryFriday,
     SpecificDate(Day, Month, Year),
@@ -17,7 +17,7 @@ pub enum Schedule {
 }
 
 impl Schedule {
-    pub fn last_period(&self, date: &DateTime) -> Option<DateTime> {
+    pub fn last_period(&self, date: &i64) -> Option<DateTime> {
         let epoch: i64 = i64::from(*date);
         let real_date = OffsetDateTime::from_unix_timestamp(epoch);
         match real_date {
@@ -42,16 +42,15 @@ impl Schedule {
         }
     }
 
-    pub fn check(&self, date: &DateTime) -> bool {
-        let epoch_date: i64 = i64::from(*date);
-        let real_date = OffsetDateTime::from_unix_timestamp(epoch_date);
+    pub fn check(&self, epoch_date: &i64) -> bool {
+        let real_date = OffsetDateTime::from_unix_timestamp(*epoch_date);
         match real_date {
             Ok(d) => match self {
                 Schedule::EveryFriday => d.weekday() == Weekday::Friday,
                 Schedule::SpecificDate(day, month, year) => {
                     d.year() == *year && d.day() == *day as u8 && d.month() as u8 == *month as u8
                 }
-                Schedule::SpecificEpoch(epoch) => *epoch == epoch_date,
+                Schedule::SpecificEpoch(epoch) => i64::from(epoch.clone()) == *epoch_date,
                 Schedule::EveryYear(day, month) => {
                     d.day() == *day as u8 && d.month() as u8 == *month as u8
                 }
