@@ -1,11 +1,11 @@
 use alator::broker::Quote;
 use alator::clock::ClockBuilder;
+use alator::exchange::DefaultExchangeBuilder;
 use alator::input::HashMapInputBuilder;
-use alator::perf::PerfStruct;
-use alator::sim::broker::SimulatedBrokerBuilder;
+use alator::sim::SimulatedBrokerBuilder;
 use alator::simcontext::SimContextBuilder;
 use alator::strategy::StaticWeightStrategyBuilder;
-use alator::types::{DateTime, PortfolioAllocation};
+use alator::types::{DateTime, PortfolioAllocation, Frequency, BacktestOutput};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::iter::zip;
@@ -33,7 +33,7 @@ pub struct AlatorResults {
     pub dates: Vec<i64>,
 }
 
-fn convert_result(res: PerfStruct) -> AlatorResults {
+fn convert_result(res: BacktestOutput) -> AlatorResults {
     AlatorResults {
         ret: res.ret,
         cagr: res.cagr,
@@ -47,17 +47,19 @@ fn convert_result(res: PerfStruct) -> AlatorResults {
 }
 
 pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
-    let clock = ClockBuilder::from_fixed(DateTime::from(input.first_date), DateTime::from(input.last_date)).daily();
+    let clock = ClockBuilder::with_length_in_dates(input.first_date, input.last_date)
+        .with_frequency(&Frequency::Daily)
+        .build();
 
     let mut raw_data: HashMap<DateTime, Vec<Quote>> = HashMap::new();
     //The input data appears to be of the same type, but the source data may not include dates which span the whole
     //period, so we need to span the whole period and insert what we can
     for date in clock.borrow().peek() {
-        if let Some(prices) = input.data.get(&(date.into())) {
+        if let Some(prices) = input.data.get(&(date.clone())) {
             let mut quotes: Vec<Quote> = Vec::new();
             for (asset, price) in zip(&input.assets, prices) {
                 let q = Quote {
-                    date: date,
+                    date: date.clone(),
                     bid: (*price).into(),
                     ask: (*price).into(),
                     symbol: asset.clone(),
@@ -74,23 +76,26 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
 
     let mut weights = PortfolioAllocation::new();
     for symbol in input.weights.keys() {
-        weights.insert(
-            &symbol.clone(),
-            &(*input.weights.get(&symbol.clone()).unwrap()).into(),
-        )
+        weights.insert(symbol.clone(), *input.weights.get(&symbol.clone()).unwrap());
     }
 
     let initial_cash = 100_000.0;
 
+    let exchange = DefaultExchangeBuilder::new()
+        .with_data_source(source.clone())
+        .with_clock(Rc::clone(&clock))
+        .build();
+
     let brkr = SimulatedBrokerBuilder::new()
         .with_data(source)
+        .with_exchange(exchange)
         .build();
     
     let strat = StaticWeightStrategyBuilder::new()
         .with_brkr(brkr)
         .with_clock(Rc::clone(&clock))
         .with_weights(weights)
-        .daily();
+        .default();
     
     let mut sim = SimContextBuilder::new()
         .with_clock(Rc::clone(&clock))
@@ -98,7 +103,7 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
         .init(&(initial_cash.into()));
 
     sim.run();
-    convert_result(sim.calculate_perf())
+    convert_result(sim.perf(Frequency::Daily))
 }
 
 #[cfg(test)]
@@ -107,7 +112,6 @@ mod tests {
     use std::collections::HashMap;
     use rand::thread_rng;
     use rand_distr::{Distribution, Normal};
-    use alator::types::DateTime;
     use alator::clock::ClockBuilder;
 
     use super::{alator_backtest, AlatorInput};
@@ -121,7 +125,9 @@ mod tests {
         let first_date = 1;
         let last_date = 100 * 86400;
         //Because we are using daily timescales in alator, this needs to be daily too
-        let clock = ClockBuilder::from_fixed(DateTime::from(first_date), DateTime::from(last_date)).daily();
+        let clock = ClockBuilder::with_length_in_dates(first_date, last_date)
+            .with_frequency(&alator::types::Frequency::Daily)
+            .build();
 
         let assets = vec![0.to_string(), 1.to_string()];
         let mut price = 100.0;

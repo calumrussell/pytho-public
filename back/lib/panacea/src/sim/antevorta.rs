@@ -1,15 +1,15 @@
 use crate::stat::build_sample_raw_daily;
 use alator::clock::ClockBuilder;
 use alator::broker::{Dividend, Quote};
+use alator::exchange::DefaultExchangeBuilder;
 use alator::input::HashMapInputBuilder;
-use alator::sim::broker::SimulatedBrokerBuilder;
+use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::input::FakeHashMapSourceSim;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
-use antevorta::country::uk::config::Config;
-use wasm_bindgen::JsValue;
+use antevorta::country::uk::Config;
 use std::collections::HashMap;
 use std::error::Error;
 use std::rc::Rc;
@@ -50,8 +50,9 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
     let sim_length = (input.sim_length * 365) as i64;
     let mut res: Vec<f64> = Vec::new();
     for _i in 0..input.runs {
-        let clock = ClockBuilder::from_length_days(&DateTime::from(start_date), sim_length-1)
-            .daily();
+        let clock = ClockBuilder::with_length_in_days(start_date, sim_length-1)
+            .with_frequency(&alator::types::Frequency::Daily)
+            .build();
 
         let mut raw_data: HashMap<DateTime, Vec<Quote>> = HashMap::new();
         if let Some(resampled_close) = build_sample_raw_daily(sim_length, input.close.clone()) {
@@ -64,12 +65,12 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
                 for asset in &input.assets {
                     let asset_closes = resampled_close.get(asset).unwrap();
                     let pos_close = asset_closes[pos as usize];
-                    let q = Quote {
-                        date: date.into(),
-                        bid: pos_close.into(),
-                        ask: pos_close.into(),
-                        symbol: asset.clone(),
-                    };
+                    let q = Quote::new(
+                        pos_close,
+                        pos_close,
+                        date.clone(),
+                        asset,
+                    );
                     quotes.push(q);
                 }
                 raw_data.insert(date.into(), quotes);
@@ -88,13 +89,19 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
 
         let mut weights = PortfolioAllocation::new();
         for symbol in input.weights.keys() {
-            weights.insert(
-                &symbol.clone(),
-                &(*input.weights.get(&symbol.clone()).unwrap()).into(),
-            )
+            weights.insert(symbol.clone(), *input.weights.get(&symbol.clone()).unwrap());
         }
 
-        let brkr = SimulatedBrokerBuilder::new().with_data(source).build();
+        let exchange = DefaultExchangeBuilder::new()
+            .with_clock(Rc::clone(&clock))
+            .with_data_source(source.clone())
+            .build();
+
+        let brkr = SimulatedBrokerBuilder::new()
+            .with_exchange(exchange)
+            .with_data(source)
+            .build();
+
         let strat = StaticInvestmentStrategy::new(
             brkr,
             Schedule::EveryFriday,

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use alator::types::{CashValue, DateTime};
 
-use crate::acc::{CanTransfer};
+use crate::acc::CanTransfer;
 use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
@@ -11,9 +11,9 @@ use super::UKSimulationState;
 use super::tax::{TaxPeriod, UKTaxableIncome};
 
 trait WillFlow<S: InvestmentStrategy> {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>);
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>);
     fn get_value(&self) -> CashValue;
-    fn set_value(&mut self, cash: &CashValue);
+    fn set_value(&mut self, cash: &f64);
 }
 
 #[derive(Clone)]
@@ -59,14 +59,14 @@ pub struct InflationDataHashMap {
 impl InflationDataHashMap {
     fn check<F: WillFlow<S>, S: InvestmentStrategy>(
         &mut self,
-        curr: &DateTime,
+        curr: &i64,
         state: &mut UKSimulationState<S>,
         target: &mut F,
     ) {
         target.check(curr, state);
         let curr_val = target.get_value();
         if let Some(inflation) = self.source.get_current_inflation() {
-            let new_val = curr_val * (1.0 + inflation);
+            let new_val = *curr_val * (1.0 + inflation);
             target.set_value(&new_val);
         } else {
             panic!("Created fixed growth rate employement income with bad date");
@@ -88,13 +88,13 @@ pub struct StaticGrowth {
 impl StaticGrowth {
     fn check<F: WillFlow<S>, S: InvestmentStrategy>(
         &mut self,
-        curr: &DateTime,
+        curr: &i64,
         state: &mut UKSimulationState<S>,
         target: &mut F,
     ) {
         target.check(curr, state);
         let curr_val = target.get_value();
-        let new_val = curr_val * (1.0 + self.growth_rate);
+        let new_val = *curr_val * (1.0 + self.growth_rate);
         target.set_value(&new_val);
     }
 
@@ -113,14 +113,14 @@ pub struct FixedGrowth {
 impl FixedGrowth {
     fn check<F: WillFlow<S>, S: InvestmentStrategy>(
         &mut self,
-        curr: &DateTime,
+        curr: &i64,
         state: &mut UKSimulationState<S>,
         target: &mut F,
     ) {
         target.check(curr, state);
         let curr_val = target.get_value();
-        if let Some(growth) = self.growth_data.get(curr) {
-            let new_val = curr_val * (1.0 + growth);
+        if let Some(growth) = self.growth_data.get(&DateTime::from(*curr)) {
+            let new_val = *curr_val * (1.0 + growth);
             target.set_value(&new_val)
         } else {
             panic!("Created fixed growth rate employement income with bad date");
@@ -139,25 +139,25 @@ pub struct Employment {
 }
 
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>) {
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
             let tax_type: UKTaxableIncome = self.clone().into();
             state.1.annual_tax.add_income(tax_type);
-            let contribution = self.value * state.0.contribution_pct;
+            let contribution = *self.value * state.0.contribution_pct;
             let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
             state.1.annual_tax.add_contribution(&contributed);
-            let net_pay = self.value - contributed + remainder;
+            let net_pay = *self.value - *contributed + *remainder;
             state.2.paid_income(&net_pay);
             state.1.bank.deposit(&net_pay);
         }
     }
 
     fn get_value(&self) -> CashValue {
-        self.value
+        self.value.clone()
     }
 
-    fn set_value(&mut self, cash: &CashValue) {
-        self.value = *cash;
+    fn set_value(&mut self, cash: &f64) {
+        self.value = CashValue::from(*cash);
     }
 }
 
@@ -196,25 +196,25 @@ pub struct EmploymentPAYE {
 }
 
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>) {
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let contribution = self.value * state.0.contribution_pct;
+            let contribution = *self.value * state.0.contribution_pct;
             let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
             state.1.annual_tax.add_contribution(&contributed);
             let paye_paid = TaxPeriod::paye(&self.value, &contributed, state.0.nic_group, &state.1.tax_config);
             state.1.annual_tax.add_paye_paid(&paye_paid.total());
-            let net_pay = self.value + remainder - contributed - paye_paid.total();
+            let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
             state.2.paid_income(&net_pay);
             state.1.bank.deposit(&net_pay);
         }
     }
 
     fn get_value(&self) -> CashValue {
-        self.value
+        self.value.clone()
     }
 
-    fn set_value(&mut self, val: &CashValue) {
-        self.value = *val;
+    fn set_value(&mut self, val: &f64) {
+        self.value = CashValue::from(*val);
     }
 }
 
@@ -253,7 +253,7 @@ pub struct Rental {
 }
 
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>) {
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
             let tax_type: UKTaxableIncome = self.clone().into();
             state.1.annual_tax.add_income(tax_type);
@@ -263,11 +263,11 @@ impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     }
 
     fn get_value(&self) -> CashValue {
-        self.value
+        self.value.clone()
     }
 
-    fn set_value(&mut self, val: &CashValue) {
-        self.value = *val;
+    fn set_value(&mut self, val: &f64) {
+        self.value = CashValue::from(*val);
     }
 }
 
@@ -294,18 +294,18 @@ pub struct Expense {
 }
 
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>) {
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
             state.1.bank.withdraw(&self.value);
         }
     }
 
     fn get_value(&self) -> CashValue {
-        self.value
+        self.value.clone()
     }
 
-    fn set_value(&mut self, val: &CashValue) {
-        self.value = *val;
+    fn set_value(&mut self, val: &f64) {
+        self.value = CashValue::from(*val);
     }
 }
 
@@ -336,14 +336,14 @@ pub struct PctOfIncomeExpense {
 }
 
 impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
-    fn check(&self, curr: &DateTime, state: &mut UKSimulationState<S>) {
+    fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            if state.2.income_paid <= 0.0 {
+            if *state.2.income_paid <= 0.0 {
                 //Panic here because if this hits then the caller likely made an error in the
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
-                let expense_value = self.pct * f64::from(state.2.income_paid);
+                let expense_value = self.pct * f64::from(*state.2.income_paid);
                 state.1.bank.withdraw(&expense_value.into());
             }
         }
@@ -353,7 +353,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
         unimplemented!("Has no value")
     }
 
-    fn set_value(&mut self, _val: &CashValue) {
+    fn set_value(&mut self, _val: &f64) {
         unimplemented!("Has no value")
     }
 }

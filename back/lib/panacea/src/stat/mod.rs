@@ -77,7 +77,9 @@ mod tests {
     fn test_sample_generator_with_insufficient_data() {
         let price_dist = Uniform::new(98.0, 102.0);
         let mut rng = thread_rng();
-        let clock = ClockBuilder::from_length_seconds(&(10.into()), 7).every_second();
+        let clock = ClockBuilder::with_length_in_seconds(10, 7)
+            .with_frequency(&alator::types::Frequency::Second)
+            .build();
 
         let mut raw_data: HashMap<String, Vec<f64>> = HashMap::new();
         let mut inner_prices: Vec<f64> = Vec::new();
@@ -96,7 +98,9 @@ mod tests {
     fn test_that_raw_sample_generator_works() {
         let price_dist = Uniform::new(98.0, 102.0);
         let mut rng = thread_rng();
-        let clock = ClockBuilder::from_length_seconds(&(10.into()), 30).every_second();
+        let clock = ClockBuilder::with_length_in_seconds(10, 30)
+            .with_frequency(&alator::types::Frequency::Second)
+            .build();
 
         let mut raw_data: HashMap<String, Vec<f64>> = HashMap::new();
         let mut inner_prices: Vec<f64> = Vec::new();
@@ -118,7 +122,9 @@ mod tests {
     fn test_that_raw_sample_generator_returns_different_values_on_each_run() {
         let price_dist = Uniform::new(98.0, 102.0);
         let mut rng = thread_rng();
-        let clock = ClockBuilder::from_length_seconds(&(10.into()), 100).every_second();
+        let clock = ClockBuilder::with_length_in_seconds(10, 100)
+            .with_frequency(&alator::types::Frequency::Second)
+            .build();
 
         let mut raw_data: HashMap<String, Vec<f64>> = HashMap::new();
         let mut inner_prices: Vec<f64> = Vec::new();

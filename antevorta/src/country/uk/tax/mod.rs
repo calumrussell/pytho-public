@@ -2,7 +2,7 @@ mod capital;
 mod income;
 mod ni;
 
-use alator::types::{CashValue, DateTime};
+use alator::types::CashValue;
 
 use crate::schedule::Schedule;
 use crate::tax::TaxRate;
@@ -23,8 +23,12 @@ pub struct UKTaxOutput {
 
 impl UKTaxOutput {
     pub fn total(&self) -> CashValue {
-        self.income.total() + self.capital_gains.total() + self.ni.total() + self.dividend
-            - self.paye_tax_paid
+        let sum = *self.income.total() 
+            + *self.capital_gains.total() 
+            + *self.ni.total() 
+            + *self.dividend
+            - *self.paye_tax_paid;
+        CashValue::from(sum)
     }
 }
 
@@ -51,7 +55,7 @@ impl UKTaxableIncome {
             | UKTaxableIncome::Rental(val)
             | UKTaxableIncome::Dividend(val)
             | UKTaxableIncome::ResiPropertyGains(val)
-            | UKTaxableIncome::OtherGains(val) => *val,
+            | UKTaxableIncome::OtherGains(val) => val.clone(),
             UKTaxableIncome::Null => CashValue::default(),
         }
     }
@@ -117,74 +121,83 @@ pub struct TaxPeriod {
 
 impl TaxPeriod {
     pub fn income(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.income())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn paye_income(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.paye())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn savings_income(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.savings())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn rental_income(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.rental())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn self_employment_income(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.self_employment())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn dividend(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.dividend())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn capital(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.capital())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn employment(&self) -> CashValue {
-        self.income
+        let sum: f64 = self.income
             .iter()
             .filter(|v| v.employment())
-            .map(|v| v.value())
-            .sum()
+            .map(|v| *v.value())
+            .sum();
+        CashValue::from(sum)
     }
 
     pub fn contributions(&self) -> CashValue {
-        self.contributions.iter().cloned().sum()
+        let sum: f64 = self.contributions.iter().cloned().map(|v| *v).sum();
+        CashValue::from(sum)
     }
 
-    pub fn check_bool(&self, date: &DateTime) -> bool {
+    pub fn check_bool(&self, date: &i64) -> bool {
         if let Some(payment_schedule) = &self.payment_schedule {
             return payment_schedule.check(date);
         }
@@ -202,12 +215,12 @@ impl TaxPeriod {
             capital_gains: cg,
             ni,
             dividend: divi,
-            paye_tax_paid: self.paye_tax_paid,
+            paye_tax_paid: self.paye_tax_paid.clone(),
         }
     }
 
     //PAYE calculations are totally stateless
-    pub fn paye(pay: &CashValue, contribution: &CashValue, ni: NIC, config: &UKTaxConfig) -> UKTaxOutput {
+    pub fn paye(pay: &f64, contribution: &f64, ni: NIC, config: &UKTaxConfig) -> UKTaxOutput {
         //Filters income passed for PAYE only so can't be called with
         //wrong input
         let it = PAYEIncomeTax::calc(pay, contribution, config);
@@ -222,16 +235,16 @@ impl TaxPeriod {
         }
     }
 
-    pub fn add_paye_paid(&mut self, amount: &CashValue) {
-        self.paye_tax_paid += *amount;
+    pub fn add_paye_paid(&mut self, amount: &f64) {
+        self.paye_tax_paid = CashValue::from(*self.paye_tax_paid + amount);
     }
 
     pub fn add_income<I: Into<UKTaxableIncome>>(&mut self, inc: I) {
         self.income.push(inc.into());
     }
 
-    pub fn add_contribution(&mut self, cont: &CashValue) {
-        self.contributions.push(*cont)
+    pub fn add_contribution(&mut self, cont: &f64) {
+        self.contributions.push(CashValue::from(*cont))
     }
 
     pub fn with_schedule(payment_schedule: Schedule, ni: NIC) -> Self {
@@ -245,7 +258,7 @@ impl TaxPeriod {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct UKTaxConfig {
     basic_income_rate: TaxRate,
     higher_income_rate: TaxRate,
@@ -326,26 +339,28 @@ impl UKTaxConfig {
             ni_band_1_rate: self.ni_band_1_rate,
             ni_band_2_rate: self.ni_band_2_rate,
             ni_band_3_rate: self.ni_band_3_rate,
-            personal_allowance_band: self.personal_allowance_band * (1.0 + value),
-            personal_allowance_taper_threshold_band: self.personal_allowance_taper_threshold_band * (1.0 + value),
-            personal_allowance_taper_value: self.personal_allowance_taper_value * (1.0 + value),
-            basic_income_top_band: self.basic_income_top_band * (1.0 + value),
-            higher_rate_top_band: self.higher_rate_top_band * (1.0 + value),
-            starting_savings_allowance_band: self.starting_savings_allowance_band * (1.0 + value),
-            self_employment_allowance_band: self.self_employment_allowance_band * (1.0 + value),
-            rental_allowance_band: self.rental_allowance_band * (1.0 + value),
-            dividend_allowance_band: self.dividend_allowance_band * (1.0 + value),
-            capital_gains_allowance_band: self.capital_gains_allowance_band * (1.0 + value),
-            ni_band_1_band: self.ni_band_1_band * (1.0 + value),
-            ni_band_2_band: self.ni_band_2_band * (1.0 + value),
-            basic_rate_savings_allowance_band: self.basic_rate_savings_allowance_band * (1.0 + value),
-            higher_rate_savings_allowance_band: self.higher_rate_savings_allowance_band * (1.0 + value),
+            personal_allowance_band: CashValue::from(*self.personal_allowance_band * (1.0 + value)),
+            personal_allowance_taper_threshold_band: CashValue::from(*self.personal_allowance_taper_threshold_band * (1.0 + value)),
+            personal_allowance_taper_value: CashValue::from(*self.personal_allowance_taper_value * (1.0 + value)),
+            basic_income_top_band: CashValue::from(*self.basic_income_top_band * (1.0 + value)),
+            higher_rate_top_band: CashValue::from(*self.higher_rate_top_band * (1.0 + value)),
+            starting_savings_allowance_band: CashValue::from(*self.starting_savings_allowance_band * (1.0 + value)),
+            self_employment_allowance_band: CashValue::from(*self.self_employment_allowance_band * (1.0 + value)),
+            rental_allowance_band: CashValue::from(*self.rental_allowance_band * (1.0 + value)),
+            dividend_allowance_band: CashValue::from(*self.dividend_allowance_band * (1.0 + value)),
+            capital_gains_allowance_band: CashValue::from(*self.capital_gains_allowance_band * (1.0 + value)),
+            ni_band_1_band: CashValue::from(*self.ni_band_1_band * (1.0 + value)),
+            ni_band_2_band: CashValue::from(*self.ni_band_2_band * (1.0 + value)),
+            basic_rate_savings_allowance_band: CashValue::from(*self.basic_rate_savings_allowance_band * (1.0 + value)),
+            higher_rate_savings_allowance_band: CashValue::from(*self.higher_rate_savings_allowance_band * (1.0 + value)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use alator::types::CashValue;
+
     use super::{TaxPeriod, UKTaxableIncome, NIC, UKTaxConfig};
     use crate::schedule::Schedule;
 
@@ -363,18 +378,18 @@ mod tests {
     #[test]
     fn test_that_income_tax_calculates_correctly() {
         //This is a rough test, not bound closely to the actual values
-        let annual_wage = 45_000.0.into();
+        let annual_wage = 45_000.0;
         let contribution_rate = 0.05;
         let contribution = annual_wage * contribution_rate;
         let config = UKTaxConfig::default();
         let schedule = Schedule::EveryYear(1, 4);
  
         let mut builder = TaxPeriod::with_schedule(schedule, NIC::A);
-        builder.add_income(UKTaxableIncome::Wage(annual_wage));
+        builder.add_income(UKTaxableIncome::Wage(CashValue::from(annual_wage)));
         builder.add_contribution(&contribution);
         let paid = builder.calc(&config);
         let _total = paid.total();
-        assert!(paid.total() > 8_000.0 && paid.total() < 12_000.0);
+        assert!(*paid.total() > 8_000.0 && *paid.total() < 12_000.0);
     }
 
     #[test]
@@ -382,20 +397,20 @@ mod tests {
         //This is a rough test that the output is sane, not that is exactly correct
         let config = UKTaxConfig::default();
         let schedule = Schedule::EveryYear(1, 4);
-        let annual_wage = 70_000.0.into();
-        let dividend = 10_000.0.into();
+        let annual_wage = 70_000.0;
+        let dividend = 10_000.0;
 
-        let mut builder = TaxPeriod::with_schedule(schedule, NIC::A);
-        builder.add_income(UKTaxableIncome::Wage(annual_wage));
-        builder.add_income(UKTaxableIncome::Dividend(dividend));
+        let mut builder = TaxPeriod::with_schedule(schedule.clone(), NIC::A);
+        builder.add_income(UKTaxableIncome::Wage(CashValue::from(annual_wage)));
+        builder.add_income(UKTaxableIncome::Dividend(CashValue::from(dividend)));
         let tax_paid = builder.calc(&config).total();
 
         //Should be within a few percent of normal income tax rate for income above
         //basic rate
         let mut builder1 = TaxPeriod::with_schedule(schedule, NIC::A);
-        builder1.add_income(UKTaxableIncome::Wage(80_000.0.into()));
+        builder1.add_income(UKTaxableIncome::Wage(CashValue::from(80_000.0)));
         let tax_paid1 = builder1.calc(&config).total();
-        assert!(tax_paid / tax_paid1 > 0.9);
+        assert!(*tax_paid / *tax_paid1 > 0.9);
     }
 
     #[test]
@@ -403,7 +418,7 @@ mod tests {
         //This is very rough until we build out everything fully
         //but PAYE should come out to somewhere near the annual
         //figure using a wage with minimal adjustments
-        let annual_wage = 80_000.0.into();
+        let annual_wage = 80_000.0;
         let contribution_rate = 0.05;
         let annual_contribution = annual_wage * contribution_rate;
         let monthly_wage = annual_wage / 12.0;
@@ -415,12 +430,12 @@ mod tests {
         let paye_paid = paye.total();
 
         let mut builder = TaxPeriod::with_schedule(schedule, NIC::A);
-        builder.add_income(UKTaxableIncome::Wage(annual_wage));
+        builder.add_income(UKTaxableIncome::Wage(CashValue::from(annual_wage)));
         builder.add_contribution(&annual_contribution);
         let tax_paid = builder.calc(&config).total();
 
-        let annualised_paye_total = paye_paid * 12.0;
-        let diff = tax_paid - annualised_paye_total;
+        let annualised_paye_total = *paye_paid * 12.0;
+        let diff = *tax_paid - annualised_paye_total;
         assert!(diff > -10.0 && diff < 10.0);
     }
 }

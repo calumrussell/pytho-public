@@ -1,29 +1,34 @@
 use alator::broker::{
-    BrokerCalculations, BrokerEvent, DividendPayment, EventLog, ExecutesOrder, PositionInfo, Trade,
-    TransferCash,
+    BrokerCalculations, DividendPayment, Trade, BacktestBroker, TransferCash, EventLog, BrokerCashEvent,
 };
 use alator::clock::Clock;
 use alator::input::HashMapInput;
-use alator::perf::{PerfStruct, StrategyPerformance};
-use alator::sim::broker::SimulatedBroker;
+use alator::sim::SimulatedBroker;
 use alator::strategy::{Strategy, StrategyEvent, TransferFrom, TransferTo};
-use alator::types::{CashValue, DateTime, PortfolioAllocation, PortfolioWeight};
+use alator::types::{CashValue, PortfolioAllocation};
 
 use crate::schedule::Schedule;
 
+//[InvestmentStrategy] supplements the [Strategy] provided by alator with methods that are relevant
+//to antevorta simulation strategies.
+//
+//.check() and .finish() are included here because the antevorta simulation modifies state outside
+//of a typical rebalance (and these changes in states have intra-account dependencies) so we need
+//to add the lifecycle methods to the strategy, so they can be called through accounts.
 pub trait InvestmentStrategy: Clone + Strategy + TransferFrom + TransferTo {
     fn get_liquidation_value(&mut self) -> CashValue;
-    fn trades_between(&self, start: &DateTime, end: &DateTime) -> Vec<Trade>;
-    fn dividends_between(&self, start: &DateTime, end: &DateTime) -> Vec<DividendPayment>;
+    fn trades_between(&self, start: &i64, end: &i64) -> Vec<Trade>;
+    fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment>;
+    fn check(&mut self);
+    fn finish(&mut self);
 }
 
 #[derive(Clone)]
 pub struct StaticInvestmentStrategy {
     brkr: SimulatedBroker<HashMapInput>,
     rebalance_schedule: Schedule,
-    target_weights: PortfolioAllocation<PortfolioWeight>,
+    target_weights: PortfolioAllocation,
     clock: Clock,
-    perf: StrategyPerformance,
 }
 
 impl Strategy for StaticInvestmentStrategy {
@@ -35,43 +40,40 @@ impl Strategy for StaticInvestmentStrategy {
                 &mut self.brkr,
             );
             if !orders.is_empty() {
-                self.brkr.execute_orders(orders);
+                self.brkr.send_orders(orders);
             }
         }
         self.get_liquidation_value()
     }
 
-    fn init(&mut self, initial_cash: &CashValue) {
-        self.brkr.deposit_cash(*initial_cash);
-    }
-
-    fn get_perf(&self) -> PerfStruct {
-        self.perf.get_output()
+    fn init(&mut self, initial_cash: &f64) {
+        self.brkr.deposit_cash(initial_cash);
+        self.brkr.finish();
     }
 }
 
 impl TransferTo for StaticInvestmentStrategy {
-    fn deposit_cash(&mut self, cash: &CashValue) -> StrategyEvent {
-        self.brkr.deposit_cash(*cash);
-        StrategyEvent::DepositSuccess(*cash)
+    fn deposit_cash(&mut self, cash: &f64) -> StrategyEvent {
+        self.brkr.deposit_cash(cash);
+        StrategyEvent::DepositSuccess(CashValue::from(*cash))
     }
 }
 
 impl TransferFrom for StaticInvestmentStrategy {
-    fn withdraw_cash(&mut self, cash: &CashValue) -> StrategyEvent {
-        if let BrokerEvent::WithdrawSuccess(amount) = self.brkr.withdraw_cash(*cash) {
+    fn withdraw_cash(&mut self, cash: &f64) -> StrategyEvent {
+        if let BrokerCashEvent::WithdrawSuccess(amount) = self.brkr.withdraw_cash(cash) {
             return StrategyEvent::WithdrawSuccess(amount);
         }
-        StrategyEvent::WithdrawFailure(*cash)
+        StrategyEvent::WithdrawFailure(CashValue::from(*cash))
     }
 
-    fn withdraw_cash_with_liquidation(&mut self, cash: &CashValue) -> StrategyEvent {
-        if let BrokerEvent::WithdrawSuccess(amount) =
+    fn withdraw_cash_with_liquidation(&mut self, cash: &f64) -> StrategyEvent {
+        if let BrokerCashEvent::WithdrawSuccess(amount) =
             BrokerCalculations::withdraw_cash_with_liquidation(cash, &mut self.brkr)
         {
             return StrategyEvent::WithdrawSuccess(amount);
         }
-        StrategyEvent::WithdrawFailure(*cash)
+        StrategyEvent::WithdrawFailure(CashValue::from(*cash))
     }
 }
 
@@ -80,12 +82,24 @@ impl InvestmentStrategy for StaticInvestmentStrategy {
         self.brkr.get_liquidation_value()
     }
 
-    fn trades_between(&self, start: &DateTime, end: &DateTime) -> Vec<Trade> {
+    fn trades_between(&self, start: &i64, end: &i64) -> Vec<Trade> {
         self.brkr.trades_between(start, end)
     }
 
-    fn dividends_between(&self, start: &DateTime, end: &DateTime) -> Vec<DividendPayment> {
+    fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment> {
         self.brkr.dividends_between(start, end)
+    }
+
+    //Have to call lifecycle methods here because antevorta simulations have their own lifecycle
+    //that aren't hooked into the broker
+    fn check(&mut self) {
+        self.brkr.check();
+    }
+
+    //Have to call lifecycle methods here because antevorta simulations have their own lifecycle
+    //that aren't hooked into the broker
+    fn finish(&mut self) {
+        self.brkr.finish();
     }
 }
 
@@ -93,16 +107,14 @@ impl StaticInvestmentStrategy {
     pub fn new(
         brkr: SimulatedBroker<HashMapInput>,
         rebalance_schedule: Schedule,
-        target_weights: PortfolioAllocation<PortfolioWeight>,
+        target_weights: PortfolioAllocation,
         clock: Clock,
     ) -> Self {
-        let perf = StrategyPerformance::daily();
         Self {
             brkr,
             rebalance_schedule,
             target_weights,
             clock,
-            perf,
         }
     }
 }

@@ -1,0 +1,9 @@
+version: "3.3"
+services:
+  monitor:
+    image: louislam/uptime-kuma
+    container_name: pythomonitor
+    ports:
+      - "100.90.117.10:3001:3001"
+    volumes:
+      - "./data:/app/data"

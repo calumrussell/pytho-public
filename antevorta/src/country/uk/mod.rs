@@ -27,7 +27,7 @@ use flow::{
     Employment, EmploymentPAYE, Expense, PctOfIncomeExpense,
     Rental 
 };
-use stack::{Mortgage, Rate};
+use stack::Mortgage;
 use mutation::{CashBalanceStrategy, Mutations, TaxStrategy};
 
 pub struct SimConstants {
@@ -58,11 +58,11 @@ pub struct SimLoopState {
 
 impl SimLoopState {
     pub fn clear(&mut self) {
-        self.income_paid = 0.0.into();
+        self.income_paid = CashValue::from(0.0);
     }
 
-    pub fn paid_income(&mut self, income: &CashValue) {
-        self.income_paid += *income;
+    pub fn paid_income(&mut self, income: &f64) {
+        self.income_paid = CashValue::from(*self.income_paid + *income);
     }
 
     pub fn init() -> Self {
@@ -82,7 +82,7 @@ pub struct UKSimulationResult {
 
 impl UKSimulationResult {
     pub fn get_total_value(&self) -> CashValue {
-        self.cash + self.isa + self.gia + self.sipp
+        CashValue::from(*self.cash + *self.isa + *self.gia + *self.sipp)
     }
 }
 
@@ -99,7 +99,7 @@ pub struct UKSimulationState<S: InvestmentStrategy>(
 impl<S: InvestmentStrategy> UKSimulationState<S> {
     pub fn get_perf(&mut self) -> UKSimulationResult {
         UKSimulationResult {
-            cash: self.1.bank.balance,
+            cash: self.1.bank.balance.clone(),
             isa: self.1.isa.liquidation_value(),
             gia: self.1.gia.liquidation_value(),
             sipp: self.1.sipp.liquidation_value(),
@@ -110,6 +110,9 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
     fn update(&mut self) {
         self.2.clear();
+        self.1.isa.check();
+        self.1.gia.check();
+        self.1.sipp.check();
 
         let curr_date = self.0.clock.borrow().now();
         //Mutations should not be modified during the simulation
@@ -137,6 +140,10 @@ impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
         for mutation in cloned_end_mutations {
             mutation.check(&curr_date, self)
         }
+
+        self.1.isa.finish();
+        self.1.gia.finish();
+        self.1.sipp.finish();
     }
 
     fn get_state(&mut self) -> SimulationValue {
@@ -212,7 +219,7 @@ impl Config {
             start_mutations,
             end_mutations,
             nic_group: self.nic,
-            annual_tax_schedule,
+            annual_tax_schedule: annual_tax_schedule.clone(),
             clock: Rc::clone(&clock),
             contribution_pct: self.contribution_pct,
         };
@@ -364,7 +371,7 @@ impl StackConfig {
             SupportedStackTypes::Gia => Stack::Gia(Gia::<S>::new_with_cash(strat, &value)),
             SupportedStackTypes::Sipp => Stack::Sipp(Sipp::<S>::new_with_cash(
                 strat,
-                lifetime_pension_contributions,
+                &lifetime_pension_contributions,
                 &value,
             )),
             SupportedStackTypes::Mortgage => {
@@ -375,11 +382,11 @@ impl StackConfig {
                 //We create the mortgage from sim start
                 let curr_date = clock.borrow().now();
 
-                let rate = Rate(self.rate.unwrap());
+                let rate = self.rate.unwrap();
                 let m = Mortgage::start(
-                    value,
+                    &value,
                     rate,
-                    curr_date,
+                    &curr_date,
                     fix_length,
                     clock,
                     src,
