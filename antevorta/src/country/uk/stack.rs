@@ -118,6 +118,14 @@ impl<S: InvestmentStrategy> Isa<S> {
         }
     }
 
+    pub fn check(&mut self) {
+        self.strat.check();
+    }
+
+    pub fn finish(&mut self) {
+        self.strat.finish();
+    }
+
     pub fn tax_year_end(&mut self) {
         self.current_tax_year_deposits = CashValue::default();
     }
@@ -140,7 +148,7 @@ impl<S: InvestmentStrategy> Isa<S> {
 
     pub fn new_with_cash(strat: S, start_cash: &f64) -> Self {
         let mut s = Self::new(strat);
-        s.deposit(start_cash);
+        s.strat.init(start_cash);
         s
     }
 
@@ -192,6 +200,14 @@ impl<S: InvestmentStrategy> Gia<S> {
         calculate_capital_gains(&all_trades, tax_year_start)
     }
 
+    pub fn check(&mut self) {
+        self.strat.check();
+    }
+
+    pub fn finish(&mut self) {
+        self.strat.finish();
+    }
+
     //broker
     pub fn get_dividends(&self, date: &i64, tax_year_start: &i64) -> CashValue {
         let all_dividends: Vec<DividendPayment> =
@@ -215,7 +231,7 @@ impl<S: InvestmentStrategy> Gia<S> {
 
     pub fn new_with_cash(strat: S, start_cash: &f64) -> Self {
         let mut s = Self::new(strat);
-        s.deposit(start_cash);
+        s.strat.init(start_cash);
         s
     }
 
@@ -301,6 +317,14 @@ impl<S: InvestmentStrategy> Sipp<S> {
         }
     }
 
+    pub fn check(&mut self) {
+        self.strat.check();
+    }
+
+    pub fn finish(&mut self) {
+        self.strat.finish();
+    }
+
     pub fn tax_year_end(&mut self) {
         self.current_tax_year_contributions = CashValue::from(0.0);
     }
@@ -323,7 +347,7 @@ impl<S: InvestmentStrategy> Sipp<S> {
         start_cash: &f64,
     ) -> Self {
         let mut s = Self::new(strat, CashValue::from(*lifetime_contributions));
-        s.deposit(start_cash);
+        s.strat.init(start_cash);
         s
     }
 

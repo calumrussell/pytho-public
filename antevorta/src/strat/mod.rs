@@ -9,10 +9,18 @@ use alator::types::{CashValue, PortfolioAllocation};
 
 use crate::schedule::Schedule;
 
+//[InvestmentStrategy] supplements the [Strategy] provided by alator with methods that are relevant
+//to antevorta simulation strategies.
+//
+//.check() and .finish() are included here because the antevorta simulation modifies state outside
+//of a typical rebalance (and these changes in states have intra-account dependencies) so we need
+//to add the lifecycle methods to the strategy, so they can be called through accounts.
 pub trait InvestmentStrategy: Clone + Strategy + TransferFrom + TransferTo {
     fn get_liquidation_value(&mut self) -> CashValue;
     fn trades_between(&self, start: &i64, end: &i64) -> Vec<Trade>;
     fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment>;
+    fn check(&mut self);
+    fn finish(&mut self);
 }
 
 #[derive(Clone)]
@@ -40,6 +48,7 @@ impl Strategy for StaticInvestmentStrategy {
 
     fn init(&mut self, initial_cash: &f64) {
         self.brkr.deposit_cash(initial_cash);
+        self.brkr.finish();
     }
 }
 
@@ -79,6 +88,18 @@ impl InvestmentStrategy for StaticInvestmentStrategy {
 
     fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment> {
         self.brkr.dividends_between(start, end)
+    }
+
+    //Have to call lifecycle methods here because antevorta simulations have their own lifecycle
+    //that aren't hooked into the broker
+    fn check(&mut self) {
+        self.brkr.check();
+    }
+
+    //Have to call lifecycle methods here because antevorta simulations have their own lifecycle
+    //that aren't hooked into the broker
+    fn finish(&mut self) {
+        self.brkr.finish();
     }
 }
 
