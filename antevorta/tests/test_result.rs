@@ -1,39 +1,14 @@
-use alator::broker::Quote;
-use alator::clock::{Clock, ClockBuilder};
+use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
-use alator::input::{HashMapInput, HashMapInputBuilder};
 use alator::sim::SimulatedBrokerBuilder;
-use alator::types::{DateTime, PortfolioAllocation};
+use alator::types::PortfolioAllocation;
 use antevorta::input::FakeHashMapSourceSim;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use antevorta::country::uk::Config;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
-
-fn build_data(clock: Clock) -> HashMapInput {
-    let ret = 0.02;
-
-    let mut fake_data: HashMap<DateTime, Vec<Quote>> = HashMap::new();
-    let mut price_abc = 100.0;
-    for date in clock.borrow().peek() {
-        let q_abc = Quote::new(
-            price_abc,
-            price_abc,
-            date.clone(),
-            "ABC"
-        );
-        fake_data.insert(date.into(), vec![q_abc]);
-        price_abc += price_abc * (1.0 + ret);
-    }
-    let source = HashMapInputBuilder::new()
-        .with_quotes(fake_data)
-        .with_clock(clock)
-        .build();
-    source
-}
 
 /*
  * Use a fixed positive return to check at a very high level whether the result makes sense
@@ -47,7 +22,6 @@ fn sim_result_test() {
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
 
-    let source = build_data(Rc::clone(&clock));
     let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
@@ -55,11 +29,11 @@ fn sim_result_test() {
 
     let exchange = DefaultExchangeBuilder::new()
         .with_clock(Rc::clone(&clock))
-        .with_data_source(source.clone())
+        .with_data_source(src.clone())
         .build();
 
     let brkr = SimulatedBrokerBuilder::new()
-        .with_data(source)
+        .with_data(src.clone())
         .with_exchange(exchange)
         .build();
 
@@ -97,7 +71,9 @@ fn sim_result_test() {
         ]
     }"#;
 
-    let sim = Config::parse(config).unwrap().create(Rc::clone(&clock), strat, src);
+    let sim = Config::parse(config)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, src);
     let mut runner = SimRunner {
         clock: Rc::clone(&clock),
         state: sim,

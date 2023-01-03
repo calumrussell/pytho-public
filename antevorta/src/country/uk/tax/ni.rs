@@ -93,7 +93,7 @@ fn ni_calc(nic: &NIC, inc: &f64, is_paye: bool, config: &UKTaxConfig) -> CashVal
         NIC::B | NIC::I => {
             let sum = *NIB2::calc(inc, is_paye, config) + *NIB1::calc(inc, is_paye, config);
             CashValue::from(sum)
-        },
+        }
         NIC::J | NIC::L | NIC::Z => {
             let sum = *NIB4::calc(inc, is_paye, config) + *NIB1::calc(inc, is_paye, config);
             CashValue::from(sum)

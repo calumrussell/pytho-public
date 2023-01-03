@@ -1,12 +1,11 @@
-
 use alator::types::CashValue;
 
 use crate::acc::{CanTransfer, TransferResult};
-use crate::input::{SimDataSource, HashMapSourceSim};
+use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::strat::InvestmentStrategy;
 
-use super::UKSimulationState;
 use super::flow::UKIncomeInternal;
+use super::UKSimulationState;
 
 #[derive(Clone)]
 pub enum Mutations {
@@ -53,7 +52,7 @@ impl CashBalanceStrategy {
 }
 
 #[derive(Clone)]
-pub struct TaxStrategy<D: SimDataSource>{
+pub struct TaxStrategy<D: SimDataSource> {
     src: D,
 }
 
@@ -66,7 +65,6 @@ impl<D: SimDataSource> TaxStrategy<D> {
             let curr_config = &state.1.tax_config;
             let new_config = curr_config.apply_inflation(inflation);
             state.1.tax_config = new_config.clone();
-
 
             let mut capital_gains = 0.0;
             let mut dividends_received = 0.0;
@@ -88,7 +86,9 @@ impl<D: SimDataSource> TaxStrategy<D> {
                 state
                     .1
                     .annual_tax
-                    .add_income(UKIncomeInternal::Dividend(CashValue::from(dividends_received)));
+                    .add_income(UKIncomeInternal::Dividend(CashValue::from(
+                        dividends_received,
+                    )));
             }
 
             let output = state.1.annual_tax.calc(&new_config);
@@ -99,7 +99,8 @@ impl<D: SimDataSource> TaxStrategy<D> {
                 //not enough then panic the simulation
                 //TODO: add a way to cancel simulation when it gets to invalid state
 
-                let cash_value = *state.1.gia.liquidation_value() + *state.1.isa.liquidation_value();
+                let cash_value =
+                    *state.1.gia.liquidation_value() + *state.1.isa.liquidation_value();
                 if cash_value < *tax_due {
                     panic!("Insufficient cash to pay tax, shut down simulation")
                 } else if *state.1.isa.liquidation_value() > *tax_due {
@@ -117,8 +118,6 @@ impl<D: SimDataSource> TaxStrategy<D> {
 
 impl<D: SimDataSource> TaxStrategy<D> {
     pub fn new(src: D) -> Self {
-        Self {
-            src
-        }
+        Self { src }
     }
 }

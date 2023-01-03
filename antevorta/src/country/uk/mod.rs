@@ -1,34 +1,31 @@
 pub mod flow;
+mod mutation;
 mod stack;
 mod tax;
-mod mutation;
 
 pub use self::tax::NIC;
 
-use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
+use std::rc::Rc;
 
 use alator::clock::Clock;
 use alator::types::CashValue;
 
 use crate::acc::CanTransfer;
 use crate::country::uk::stack::BankAcc;
+use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
 use crate::schedule::Schedule;
 use crate::sim::{SimulationState, SimulationValue};
 use crate::strat::InvestmentStrategy;
-use crate::input::HashMapSourceSim;
 
 use flow::Flow;
+use flow::{Employment, EmploymentPAYE, Expense, PctOfIncomeExpense, Rental};
+use mutation::{CashBalanceStrategy, Mutations, TaxStrategy};
+use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
-use flow::{
-    Employment, EmploymentPAYE, Expense, PctOfIncomeExpense,
-    Rental 
-};
-use stack::Mortgage;
-use mutation::{CashBalanceStrategy, Mutations, TaxStrategy};
 
 pub struct SimConstants {
     //Has to be ordered, tax has to be calculated first
@@ -172,7 +169,7 @@ impl Config {
         //TODO: the bank account should be given as part of the config and initialised rather than
         //have the input as a special value
         let mut bank = BankAcc::new();
-        bank.deposit(&(self.starting_cash).into());
+        bank.deposit(&self.starting_cash);
 
         let mut gia: Option<Gia<S>> = None;
         let mut sipp: Option<Sipp<S>> = None;
@@ -200,7 +197,7 @@ impl Config {
         }
 
         let cash_strategy =
-            Mutations::CashBalance(CashBalanceStrategy::new(&(self.emergency_cash_min.into())));
+            Mutations::CashBalance(CashBalanceStrategy::new(&self.emergency_cash_min));
         let tax_strategy = Mutations::TaxHashSource(TaxStrategy::new(src.clone()));
 
         let start_mutations = vec![cash_strategy.clone(), tax_strategy];
@@ -304,36 +301,28 @@ impl FlowConfig {
         let schedule: Schedule = self.schedule.into();
         match &self.flow_type {
             SupportedFlowTypes::Employment => {
-                return Employment::flow(self.value.unwrap().into(), schedule)
+                Employment::flow(self.value.unwrap().into(), schedule)
             }
             SupportedFlowTypes::EmploymentPAYE => {
-                return EmploymentPAYE::flow(self.value.unwrap().into(), schedule)
+                EmploymentPAYE::flow(self.value.unwrap().into(), schedule)
             }
-            SupportedFlowTypes::Expense => {
-                return Expense::flow(self.value.unwrap().into(), schedule)
-            }
-            SupportedFlowTypes::Rental => {
-                return Rental::flow(self.value.unwrap().into(), schedule)
-            }
+            SupportedFlowTypes::Expense => Expense::flow(self.value.unwrap().into(), schedule),
+            SupportedFlowTypes::Rental => Rental::flow(self.value.unwrap().into(), schedule),
             SupportedFlowTypes::InflationLinkedExpense => {
-                return Expense::inflation_linked(self.value.unwrap().into(), schedule, src.clone())
+                Expense::inflation_linked(self.value.unwrap().into(), schedule, src.clone())
             }
-            SupportedFlowTypes::EmploymentStaticGrowth => {
-                return Employment::static_growth(
-                    self.value.unwrap().into(),
-                    schedule,
-                    self.static_growth.unwrap().into(),
-                )
-            }
-            SupportedFlowTypes::EmploymentPAYEStaticGrowth => {
-                return EmploymentPAYE::static_growth(
-                    self.value.unwrap().into(),
-                    schedule,
-                    self.static_growth.unwrap().into(),
-                )
-            }
+            SupportedFlowTypes::EmploymentStaticGrowth => Employment::static_growth(
+                self.value.unwrap().into(),
+                schedule,
+                self.static_growth.unwrap(),
+            ),
+            SupportedFlowTypes::EmploymentPAYEStaticGrowth => EmploymentPAYE::static_growth(
+                self.value.unwrap().into(),
+                schedule,
+                self.static_growth.unwrap(),
+            ),
             SupportedFlowTypes::PctOfIncomeExpense => {
-                return PctOfIncomeExpense::flow(self.pct.unwrap().into(), schedule)
+                PctOfIncomeExpense::flow(self.pct.unwrap(), schedule)
             }
         }
     }
@@ -383,15 +372,8 @@ impl StackConfig {
                 let curr_date = clock.borrow().now();
 
                 let rate = self.rate.unwrap();
-                let m = Mortgage::start(
-                    &value,
-                    rate,
-                    &curr_date,
-                    fix_length,
-                    clock,
-                    src,
-                );
-                return Stack::Mortgage(m);
+                let m = Mortgage::start(&value, rate, &curr_date, fix_length, clock, src);
+                Stack::Mortgage(m)
             }
         }
     }
@@ -468,4 +450,3 @@ mod tests {
         Config::parse(data).unwrap();
     }
 }
-

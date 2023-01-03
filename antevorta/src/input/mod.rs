@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use alator::{clock::Clock, types::DateTime};
+use alator::{
+    broker::{Dividend, Quote},
+    clock::Clock,
+    input::{DataSource, DividendsHashMap, QuotesHashMap},
+    types::DateTime,
+};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 
 type SimDataRep = HashMap<DateTime, f64>;
 
-pub trait SimDataSource: Clone {
+pub trait SimDataSource: Clone + DataSource {
     fn get_current_inflation(&self) -> Option<&f64>;
     fn get_current_interest_rate(&self) -> Option<&f64>;
     fn get_current_house_price_return(&self) -> Option<&f64>;
@@ -19,6 +24,8 @@ pub struct HashMapSourceSim {
     inflation: SimDataRep,
     rates: SimDataRep,
     house_price_rets: SimDataRep,
+    quotes: QuotesHashMap,
+    dividends: DividendsHashMap,
 }
 
 impl SimDataSource for HashMapSourceSim {
@@ -38,18 +45,46 @@ impl SimDataSource for HashMapSourceSim {
     }
 }
 
+impl DataSource for HashMapSourceSim {
+    fn get_quote(&self, symbol: &str) -> Option<Quote> {
+        let curr_date = self.clock.borrow().now();
+        if let Some(quotes) = self.quotes.get(&curr_date) {
+            for quote in quotes {
+                if quote.symbol.eq(symbol) {
+                    return Some(quote.clone());
+                }
+            }
+        }
+        None
+    }
+
+    fn get_quotes(&self) -> Option<&Vec<Quote>> {
+        let curr_date = self.clock.borrow().now();
+        self.quotes.get(&curr_date)
+    }
+
+    fn get_dividends(&self) -> Option<&Vec<Dividend>> {
+        let curr_date = self.clock.borrow().now();
+        self.dividends.get(&curr_date)
+    }
+}
+
 impl HashMapSourceSim {
     pub fn new(
         clock: Clock,
         inflation: SimDataRep,
         rates: SimDataRep,
         house_price_rets: SimDataRep,
+        quotes: QuotesHashMap,
+        dividends: DividendsHashMap,
     ) -> Self {
         Self {
             clock,
             inflation,
             rates,
             house_price_rets,
+            quotes,
+            dividends,
         }
     }
 }
@@ -59,6 +94,8 @@ pub struct HashMapSourceSimBuilder {
     inflation: SimDataRep,
     rates: SimDataRep,
     house_price_rets: SimDataRep,
+    quotes: QuotesHashMap,
+    dividends: DividendsHashMap,
 }
 
 impl HashMapSourceSimBuilder {
@@ -82,7 +119,17 @@ impl HashMapSourceSimBuilder {
         self
     }
 
-    pub fn build(&mut self) -> HashMapSourceSim {
+    pub fn with_quotes(&mut self, quotes: QuotesHashMap) -> &mut Self {
+        self.quotes = quotes;
+        self
+    }
+
+    pub fn with_dividends(&mut self, dividends: DividendsHashMap) -> &mut Self {
+        self.dividends = dividends;
+        self
+    }
+
+    pub fn build(&self) -> HashMapSourceSim {
         if self.clock.is_none() {
             panic!("HashMapSourceSimBuilder must set clock with with_clock");
         }
@@ -92,6 +139,8 @@ impl HashMapSourceSimBuilder {
             self.inflation.clone(),
             self.rates.clone(),
             self.house_price_rets.clone(),
+            self.quotes.clone(),
+            self.dividends.clone(),
         )
     }
 
@@ -101,6 +150,8 @@ impl HashMapSourceSimBuilder {
             inflation: HashMap::new(),
             rates: HashMap::new(),
             house_price_rets: HashMap::new(),
+            quotes: HashMap::new(),
+            dividends: HashMap::new(),
         }
     }
 }
@@ -127,11 +178,55 @@ impl FakeHashMapSourceSim {
             house_price_rets.insert(date, dist.sample(&mut rng));
         }
 
+        let mut fake_data: QuotesHashMap = HashMap::new();
+        let mut price_abc = 100.0;
+        let mut price_bcd = 100.0;
+        for date in clock.borrow().peek() {
+            let q_abc = Quote::new(price_abc, price_abc, date.clone(), "ABC");
+            let q_bcd = Quote::new(price_bcd, price_bcd, date.clone(), "BCD");
+            fake_data.insert(date, vec![q_abc, q_bcd]);
+            price_abc += price_abc * (1.0 + dist.sample(&mut rng));
+            price_bcd += price_bcd * (1.0 + dist.sample(&mut rng));
+        }
+
         HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)
             .with_inflation(inflation)
             .with_house_prices(house_price_rets)
+            .with_quotes(fake_data)
+            .build()
+    }
+}
+
+pub struct FakeHashMapSourceSimWithQuotes;
+
+impl FakeHashMapSourceSimWithQuotes {
+    pub fn get(clock: Clock, quotes: QuotesHashMap) -> HashMapSourceSim {
+        let mut rng = thread_rng();
+        let dist = Normal::new(0.02, 0.1).unwrap();
+
+        let mut inflation: SimDataRep = HashMap::new();
+        for date in clock.borrow().peek() {
+            inflation.insert(date, dist.sample(&mut rng));
+        }
+
+        let mut rates: SimDataRep = HashMap::new();
+        for date in clock.borrow().peek() {
+            rates.insert(date, dist.sample(&mut rng));
+        }
+
+        let mut house_price_rets: SimDataRep = HashMap::new();
+        for date in clock.borrow().peek() {
+            house_price_rets.insert(date, dist.sample(&mut rng));
+        }
+
+        HashMapSourceSimBuilder::start()
+            .with_clock(Rc::clone(&clock))
+            .with_rates(rates)
+            .with_inflation(inflation)
+            .with_house_prices(house_price_rets)
+            .with_quotes(quotes)
             .build()
     }
 }
