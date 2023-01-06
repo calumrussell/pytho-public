@@ -482,7 +482,6 @@ impl AmortizingLoanLogic {
         }
 
         let payment_due = self.payment_due(amortization_payment);
-        println!("{:?}", payment_due);
         if let TransferResult::Success = src.withdraw(&payment_due) {
             return LoanEvent::PaymentSuccess(payment_due);
         }

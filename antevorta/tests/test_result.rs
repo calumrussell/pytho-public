@@ -15,10 +15,7 @@ use antevorta::strat::StaticInvestmentStrategy;
  */
 #[test]
 fn sim_result_test() {
-    let start_date = 1;
-    const SIM_LENGTH: i64 = 10;
-    let end_date = start_date + ((SIM_LENGTH + 1) * 86_400);
-    let clock = ClockBuilder::with_length_in_dates(start_date, end_date)
+    let clock = ClockBuilder::with_length_in_days(1, 365*5)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
 
@@ -51,7 +48,7 @@ fn sim_result_test() {
                 "flow_type": "Employment",
                 "value": 4000.0,
                 "schedule": {
-                    "schedule_type": "EveryDay"
+                    "schedule_type": "EndOfMonth"
                 }
             }
         ],
@@ -74,10 +71,13 @@ fn sim_result_test() {
     let sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
+
     let mut runner = SimRunner {
         clock: Rc::clone(&clock),
         state: sim,
     };
     let perf = runner.run();
+    println!("{:?}", perf);
     assert!(perf.0 > 40_000.0);
+    assert!(true==false);
 }

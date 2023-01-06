@@ -5,7 +5,8 @@ use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::strat::InvestmentStrategy;
 
 use super::flow::UKIncomeInternal;
-use super::UKSimulationState;
+use super::tax::TaxPeriod;
+use super::{UKSimulationState, SimState};
 
 #[derive(Clone)]
 pub enum Mutations {
@@ -93,16 +94,15 @@ impl<D: SimDataSource> TaxStrategy<D> {
 
             let output = state.1.annual_tax.calc(&new_config);
             let tax_due = output.total();
-
             if let TransferResult::Failure = state.1.bank.withdraw(&tax_due) {
                 //Not enough cash in bank to pay taxes, liquidate cash accounts if there is still
-                //not enough then panic the simulation
-                //TODO: add a way to cancel simulation when it gets to invalid state
+                //not enough then enter unrecoverable state which pauses all forward progress with
+                //simulation
 
                 let cash_value =
                     *state.1.gia.liquidation_value() + *state.1.isa.liquidation_value();
                 if cash_value < *tax_due {
-                    panic!("Insufficient cash to pay tax, shut down simulation")
+                    state.1.sim_state = SimState::Unrecoverable;
                 } else if *state.1.isa.liquidation_value() > *tax_due {
                     state.1.isa.liquidate(&tax_due);
                 } else {
@@ -112,6 +112,7 @@ impl<D: SimDataSource> TaxStrategy<D> {
                     state.1.gia.liquidate(&remainder);
                 }
             }
+            state.1.annual_tax = TaxPeriod::with_schedule(state.0.annual_tax_schedule.clone(), state.0.nic_group.clone());
         }
     }
 }

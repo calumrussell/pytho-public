@@ -18,7 +18,7 @@ pub trait SimDataSource: Clone + DataSource {
     fn get_current_house_price_return(&self) -> Option<&f64>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HashMapSourceSim {
     clock: Clock,
     inflation: SimDataRep,
@@ -161,21 +161,21 @@ pub struct FakeHashMapSourceSim;
 impl FakeHashMapSourceSim {
     pub fn get(clock: Clock) -> HashMapSourceSim {
         let mut rng = thread_rng();
-        let dist = Normal::new(0.02, 0.1).unwrap();
+        let dist = Normal::new(0.0, 0.015).unwrap();
 
         let mut inflation: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            inflation.insert(date, dist.sample(&mut rng));
+            inflation.insert(date, 0.0);
         }
 
         let mut rates: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            rates.insert(date, dist.sample(&mut rng));
+            rates.insert(date, 0.0);
         }
 
         let mut house_price_rets: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            house_price_rets.insert(date, dist.sample(&mut rng));
+            house_price_rets.insert(date, 0.0);
         }
 
         let mut fake_data: QuotesHashMap = HashMap::new();
@@ -185,8 +185,12 @@ impl FakeHashMapSourceSim {
             let q_abc = Quote::new(price_abc, price_abc, date.clone(), "ABC");
             let q_bcd = Quote::new(price_bcd, price_bcd, date.clone(), "BCD");
             fake_data.insert(date, vec![q_abc, q_bcd]);
-            price_abc += price_abc * (1.0 + dist.sample(&mut rng));
-            price_bcd += price_bcd * (1.0 + dist.sample(&mut rng));
+
+            let pct_return_abc = dist.sample(&mut rng);
+            let pct_return_bcd = dist.sample(&mut rng);
+
+            price_abc *= 1.0 + pct_return_abc;
+            price_bcd *= 1.0 + pct_return_bcd;
         }
 
         HashMapSourceSimBuilder::start()
@@ -203,22 +207,19 @@ pub struct FakeHashMapSourceSimWithQuotes;
 
 impl FakeHashMapSourceSimWithQuotes {
     pub fn get(clock: Clock, quotes: QuotesHashMap) -> HashMapSourceSim {
-        let mut rng = thread_rng();
-        let dist = Normal::new(0.02, 0.1).unwrap();
-
         let mut inflation: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            inflation.insert(date, dist.sample(&mut rng));
+            inflation.insert(date, 0.0);
         }
 
         let mut rates: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            rates.insert(date, dist.sample(&mut rng));
+            rates.insert(date, 0.0);
         }
 
         let mut house_price_rets: SimDataRep = HashMap::new();
         for date in clock.borrow().peek() {
-            house_price_rets.insert(date, dist.sample(&mut rng));
+            house_price_rets.insert(date, 0.0);
         }
 
         HashMapSourceSimBuilder::start()

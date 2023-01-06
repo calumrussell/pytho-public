@@ -27,6 +27,13 @@ use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
 
+pub enum SimState {
+    Ready,
+    //If in unrecoverable state, all further mutations to state stop should only happen when we run
+    //out of money
+    Unrecoverable,
+}
+
 pub struct SimConstants {
     //Has to be ordered, tax has to be calculated first
     pub start_mutations: Vec<Mutations>,
@@ -47,6 +54,7 @@ pub struct SimMutableState<S: InvestmentStrategy> {
     pub isa: Isa<S>,
     pub annual_tax: TaxPeriod,
     pub tax_config: UKTaxConfig,
+    pub sim_state: SimState,
 }
 
 pub struct SimLoopState {
@@ -106,41 +114,47 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
 impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
     fn update(&mut self) {
-        self.2.clear();
-        self.1.isa.check();
-        self.1.gia.check();
-        self.1.sipp.check();
+        match self.1.sim_state {
+            SimState::Ready => {
+                self.2.clear();
+                self.1.isa.check();
+                self.1.gia.check();
+                self.1.sipp.check();
 
-        let curr_date = self.0.clock.borrow().now();
-        //Mutations should not be modified during the simulation
-        let cloned_start_mutations: Vec<Mutations> = self.0.start_mutations.to_vec();
-        for mutation in cloned_start_mutations {
-            mutation.check(&curr_date, self)
+                let curr_date = self.0.clock.borrow().now();
+                //Mutations should not be modified during the simulation
+                let cloned_start_mutations: Vec<Mutations> = self.0.start_mutations.to_vec();
+                for mutation in cloned_start_mutations {
+                    mutation.check(&curr_date, self)
+                }
+
+                self.1.isa.rebalance();
+                self.1.gia.rebalance();
+                self.1.sipp.rebalance();
+
+                //We cannot pass the reference to self to flows whilst iterating over flows which are also
+                //on self, we therefore need to clone
+                let mut cloned_flows: Vec<Flow> = self.1.flows.to_vec();
+                for flow in cloned_flows.iter_mut() {
+                    flow.check(&curr_date, self);
+                }
+                //The internal state of the flows may have changed here, so we need to overwite flows on
+                //self
+                self.1.flows = cloned_flows;
+
+                //Mutations should not be modified during the simulation
+                let cloned_end_mutations: Vec<Mutations> = self.0.end_mutations.to_vec();
+                for mutation in cloned_end_mutations {
+                    mutation.check(&curr_date, self)
+                }
+
+                self.1.isa.finish();
+                self.1.gia.finish();
+                self.1.sipp.finish();
+            }, 
+            //If unrecoverable then no further updates
+            SimState::Unrecoverable => {}
         }
-
-        self.1.isa.rebalance();
-        self.1.gia.rebalance();
-        self.1.sipp.rebalance();
-
-        //We cannot pass the reference to self to flows whilst iterating over flows which are also
-        //on self, we therefore need to clone
-        let mut cloned_flows: Vec<Flow> = self.1.flows.to_vec();
-        for flow in cloned_flows.iter_mut() {
-            flow.check(&curr_date, self);
-        }
-        //The internal state of the flows may have changed here, so we need to overwite flows on
-        //self
-        self.1.flows = cloned_flows;
-
-        //Mutations should not be modified during the simulation
-        let cloned_end_mutations: Vec<Mutations> = self.0.end_mutations.to_vec();
-        for mutation in cloned_end_mutations {
-            mutation.check(&curr_date, self)
-        }
-
-        self.1.isa.finish();
-        self.1.gia.finish();
-        self.1.sipp.finish();
     }
 
     fn get_state(&mut self) -> SimulationValue {
@@ -229,6 +243,7 @@ impl Config {
             isa: isa.unwrap(),
             annual_tax: TaxPeriod::with_schedule(annual_tax_schedule, self.nic),
             tax_config: UKTaxConfig::default(),
+            sim_state: SimState::Ready,
         };
 
         let loop_state = SimLoopState::init();

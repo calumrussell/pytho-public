@@ -194,7 +194,6 @@ impl IncomeTax {
 
     pub fn taxable_income(period: &TaxPeriod) -> CashValue {
         let total_income = period.income();
-        //Contribution won't be invalid because rules are encoded
         //in SIPP account, and we only pass contribution after we are
         //sure that it can be deposited into account with breaking limits
         let total_contributions = period.contributions();
