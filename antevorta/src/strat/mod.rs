@@ -22,6 +22,10 @@ pub trait InvestmentStrategy: Clone + Strategy + TransferFrom + TransferTo {
     fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment>;
     fn check(&mut self);
     fn finish(&mut self);
+    //Special method to completely zero, required when client has hit some external liquidation
+    //condition outside the lifecycle of the broker, should not be called within normal trading
+    //cycle
+    fn zero(&mut self);
 }
 
 #[derive(Clone)]
@@ -101,6 +105,12 @@ impl InvestmentStrategy for StaticInvestmentStrategy {
     //that aren't hooked into the broker
     fn finish(&mut self) {
         self.brkr.finish();
+    }
+
+    fn zero(&mut self) {
+        //Effectively zeros the account balance, does not need to be called on brokers where there
+        //can be called by clients with a liability beyond cash balance.
+        self.withdraw_cash_with_liquidation(&self.brkr.get_liquidation_value());
     }
 }
 

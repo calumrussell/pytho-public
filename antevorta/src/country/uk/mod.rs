@@ -151,7 +151,7 @@ impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
                 self.1.isa.finish();
                 self.1.gia.finish();
                 self.1.sipp.finish();
-            }, 
+            }
             //If unrecoverable then no further updates
             SimState::Unrecoverable => {}
         }

@@ -115,6 +115,10 @@ pub struct Isa<S: InvestmentStrategy> {
 
 //Tax year state is controlled from within the simulation.
 impl<S: InvestmentStrategy> Isa<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn rebalance(&mut self) {
         if *self.strat.get_liquidation_value() > 0.0 {
             self.strat.update();
@@ -197,6 +201,10 @@ pub struct Gia<S: InvestmentStrategy> {
 }
 
 impl<S: InvestmentStrategy> Gia<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn get_capital_gains(&self, date: &i64, tax_year_start: &i64) -> CashValue {
         //To calculate capital gains we need the whole trade history for that symbol
         let all_trades: Vec<Trade> = self.strat.trades_between(&0, date);
@@ -316,6 +324,10 @@ pub struct Sipp<S: InvestmentStrategy> {
 }
 
 impl<S: InvestmentStrategy> Sipp<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn liquidation_value(&mut self) -> CashValue {
         self.strat.get_liquidation_value()
     }
@@ -388,6 +400,12 @@ impl<S: InvestmentStrategy> CanTransfer for Sipp<S> {
 #[derive(Clone, Debug)]
 pub struct BankAcc {
     pub balance: CashValue,
+}
+
+impl BankAcc {
+    pub fn zero(&mut self) {
+        self.withdraw(&self.balance.clone());
+    }
 }
 
 impl CanTransfer for BankAcc {

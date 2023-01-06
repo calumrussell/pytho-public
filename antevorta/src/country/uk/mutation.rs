@@ -6,7 +6,7 @@ use crate::strat::InvestmentStrategy;
 
 use super::flow::UKIncomeInternal;
 use super::tax::TaxPeriod;
-use super::{UKSimulationState, SimState};
+use super::{SimState, UKSimulationState};
 
 #[derive(Clone)]
 pub enum Mutations {
@@ -103,6 +103,11 @@ impl<D: SimDataSource> TaxStrategy<D> {
                     *state.1.gia.liquidation_value() + *state.1.isa.liquidation_value();
                 if cash_value < *tax_due {
                     state.1.sim_state = SimState::Unrecoverable;
+                    //In unrecoverable state, zero all the accounts
+                    state.1.gia.zero();
+                    state.1.isa.zero();
+                    state.1.sipp.zero();
+                    state.1.bank.zero();
                 } else if *state.1.isa.liquidation_value() > *tax_due {
                     state.1.isa.liquidate(&tax_due);
                 } else {
@@ -112,7 +117,10 @@ impl<D: SimDataSource> TaxStrategy<D> {
                     state.1.gia.liquidate(&remainder);
                 }
             }
-            state.1.annual_tax = TaxPeriod::with_schedule(state.0.annual_tax_schedule.clone(), state.0.nic_group.clone());
+            state.1.annual_tax = TaxPeriod::with_schedule(
+                state.0.annual_tax_schedule.clone(),
+                state.0.nic_group.clone(),
+            );
         }
     }
 }

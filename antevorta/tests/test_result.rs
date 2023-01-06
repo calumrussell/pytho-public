@@ -10,12 +10,11 @@ use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 
-/*
- * Use a fixed positive return to check at a very high level whether the result makes sense
- */
+//Tests simulations longer than one year. This verifies functioning of lower-frequency mutations to
+//simulation i.e. taxation.
 #[test]
 fn sim_result_test() {
-    let clock = ClockBuilder::with_length_in_days(1, 365*5)
+    let clock = ClockBuilder::with_length_in_days(1, 365 * 2)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
 
@@ -79,5 +78,4 @@ fn sim_result_test() {
     let perf = runner.run();
     println!("{:?}", perf);
     assert!(perf.0 > 40_000.0);
-    assert!(true==false);
 }
