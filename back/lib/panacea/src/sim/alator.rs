@@ -151,6 +151,5 @@ mod tests {
         };
 
         let res = alator_backtest(input);
-        println!("{:?}", res);
     }
 }

@@ -1,11 +1,10 @@
 use crate::stat::build_sample_raw_daily;
 use alator::clock::ClockBuilder;
-use alator::broker::{Dividend, Quote};
+use alator::broker::Quote;
 use alator::exchange::DefaultExchangeBuilder;
-use alator::input::HashMapInputBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::input::FakeHashMapSourceSim;
+use antevorta::input::FakeHashMapSourceSimWithQuotes;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
@@ -27,12 +26,14 @@ impl fmt::Display for AntevortaInsufficientDataError {
 
 impl Error for AntevortaInsufficientDataError {}
 
+pub type AntevortaPriceInput = HashMap<String, Vec<f64>>;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaMultipleInput {
     pub assets: Vec<String>,
     pub weights: HashMap<String, f64>,
     pub dates: Vec<i64>,
-    pub close: HashMap<String, Vec<f64>>,
+    pub close: AntevortaPriceInput, 
     pub sim_length: i64,
     pub runs: i64,
     //We wait to convert to SimulationState until we are inside the creation loop
@@ -49,7 +50,9 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
     let start_date = input.dates.first().unwrap().clone();
     let sim_length = (input.sim_length * 365) as i64;
     let mut res: Vec<f64> = Vec::new();
+
     for _i in 0..input.runs {
+
         let clock = ClockBuilder::with_length_in_days(start_date, sim_length-1)
             .with_frequency(&alator::types::Frequency::Daily)
             .build();
@@ -79,13 +82,8 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
         } else {
             return Err(Box::new(AntevortaInsufficientDataError));
         }
-        let raw_dividends: HashMap<DateTime, Vec<Dividend>> = HashMap::new();
-        let source = HashMapInputBuilder::new()
-            .with_quotes(raw_data)
-            .with_dividends(raw_dividends)
-            .with_clock(Rc::clone(&clock))
-            .build();
-        let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
+
+        let src = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), raw_data);
 
         let mut weights = PortfolioAllocation::new();
         for symbol in input.weights.keys() {
@@ -94,12 +92,12 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
 
         let exchange = DefaultExchangeBuilder::new()
             .with_clock(Rc::clone(&clock))
-            .with_data_source(source.clone())
+            .with_data_source(src.clone())
             .build();
 
         let brkr = SimulatedBrokerBuilder::new()
             .with_exchange(exchange)
-            .with_data(source)
+            .with_data(src.clone())
             .build();
 
         let strat = StaticInvestmentStrategy::new(
@@ -202,11 +200,10 @@ mod tests {
             assets,
             close,
             weights,
-            sim_length: 5,
-            runs: 5,
+            sim_length: 2,
+            runs: 2,
             config: String::from(data),
         };
-        let res = antevorta_multiple(input);
-        println!("{:?}", res);
+        let _res = antevorta_multiple(input).unwrap();
     }
 }
