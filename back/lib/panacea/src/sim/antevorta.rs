@@ -1,19 +1,19 @@
 use crate::stat::build_sample_raw_daily;
-use alator::clock::ClockBuilder;
 use alator::broker::Quote;
+use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
+use antevorta::country::uk::Config;
 use antevorta::input::FakeHashMapSourceSimWithQuotes;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
-use antevorta::country::uk::Config;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::rc::Rc;
 use std::fmt;
-use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct AntevortaInsufficientDataError;
@@ -33,7 +33,7 @@ pub struct AntevortaMultipleInput {
     pub assets: Vec<String>,
     pub weights: HashMap<String, f64>,
     pub dates: Vec<i64>,
-    pub close: AntevortaPriceInput, 
+    pub close: AntevortaPriceInput,
     pub sim_length: i64,
     pub runs: i64,
     //We wait to convert to SimulationState until we are inside the creation loop
@@ -45,15 +45,16 @@ pub struct AntevortaResults {
     pub values: Vec<f64>,
 }
 
-pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResults, Box<dyn Error>> {
+pub fn antevorta_multiple(
+    input: AntevortaMultipleInput,
+) -> Result<AntevortaResults, Box<dyn Error>> {
     //Date inputs is misleading, we only use the start_date to resample from
     let start_date = input.dates.first().unwrap().clone();
     let sim_length = (input.sim_length * 365) as i64;
     let mut res: Vec<f64> = Vec::new();
 
     for _i in 0..input.runs {
-
-        let clock = ClockBuilder::with_length_in_days(start_date, sim_length-1)
+        let clock = ClockBuilder::with_length_in_days(start_date, sim_length - 1)
             .with_frequency(&alator::types::Frequency::Daily)
             .build();
 
@@ -68,12 +69,7 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
                 for asset in &input.assets {
                     let asset_closes = resampled_close.get(asset).unwrap();
                     let pos_close = asset_closes[pos as usize];
-                    let q = Quote::new(
-                        pos_close,
-                        pos_close,
-                        date.clone(),
-                        asset,
-                    );
+                    let q = Quote::new(pos_close, pos_close, date.clone(), asset);
                     quotes.push(q);
                 }
                 raw_data.insert(date.into(), quotes);
@@ -100,12 +96,8 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
             .with_data(src.clone())
             .build();
 
-        let strat = StaticInvestmentStrategy::new(
-            brkr,
-            Schedule::EveryFriday,
-            weights,
-            Rc::clone(&clock),
-        );
+        let strat =
+            StaticInvestmentStrategy::new(brkr, Schedule::EveryFriday, weights, Rc::clone(&clock));
         let config = Config::parse(&input.config.clone()).unwrap();
 
         let sim = config.create(Rc::clone(&clock), strat, src);
@@ -122,10 +114,10 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
     use rand::distributions::Uniform;
     use rand::thread_rng;
     use rand_distr::Distribution;
+    use std::collections::HashMap;
 
     use super::{antevorta_multiple, AntevortaMultipleInput};
 

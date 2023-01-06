@@ -1,8 +1,8 @@
-use std::collections::{HashSet, HashMap};
 use alator::types::DateTime;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
-use crate::sim::{AntevortaPriceInput, AntevortaMultipleInput};
+use crate::sim::{AntevortaMultipleInput, AntevortaPriceInput};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EodRow {
@@ -16,7 +16,7 @@ pub struct EodRow {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct EodRawAntevortaInput { 
+pub struct EodRawAntevortaInput {
     pub assets: Vec<String>,
     pub close: Vec<Vec<EodRow>>,
     pub weights: HashMap<String, f64>,
@@ -97,16 +97,16 @@ impl From<EodRawAntevortaInput> for AntevortaMultipleInput {
 
 #[derive(Deserialize, Serialize)]
 struct TestEodInput {
-    data: Vec<EodRow>
+    data: Vec<EodRow>,
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
-    use crate::sim::{AntevortaMultipleInput, antevorta_multiple};
+    use crate::sim::{antevorta_multiple, AntevortaMultipleInput};
 
-    use super::{TestEodInput, EodRow, EodRawAntevortaInput};
+    use super::{EodRawAntevortaInput, EodRow, TestEodInput};
 
     fn setup() -> EodRawAntevortaInput {
         let text = std::fs::read_to_string("./src/data/data.json").unwrap();
@@ -188,7 +188,7 @@ mod tests {
                 close: 10.0,
                 adjusted_close: 10.0,
                 volume: 10.0,
-            }
+            },
         ];
         let bcd = vec![
             EodRow {
@@ -208,7 +208,7 @@ mod tests {
                 close: 10.0,
                 adjusted_close: 10.0,
                 volume: 10.0,
-            }
+            },
         ];
 
         let input = EodRawAntevortaInput {
@@ -224,7 +224,10 @@ mod tests {
         //Queries the length of the price series which should be the length of bcd
         assert_eq!(antevorta.close.get("101").unwrap().len(), 2);
         //Asserts that the length of the prices series are equal
-        assert_eq!(antevorta.close.get("101").unwrap().len(), antevorta.close.get("102").unwrap().len());
+        assert_eq!(
+            antevorta.close.get("101").unwrap().len(),
+            antevorta.close.get("102").unwrap().len()
+        );
         //Asserts date conversion
         assert_eq!(antevorta.dates, vec![1633165200, 1633251600]);
     }

@@ -5,12 +5,11 @@ use alator::input::HashMapInputBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::simcontext::SimContextBuilder;
 use alator::strategy::StaticWeightStrategyBuilder;
-use alator::types::{DateTime, PortfolioAllocation, Frequency, BacktestOutput};
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::iter::zip;
+use alator::types::{BacktestOutput, DateTime, Frequency, PortfolioAllocation};
 use serde::{Deserialize, Serialize};
-
+use std::collections::HashMap;
+use std::iter::zip;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AlatorInput {
@@ -90,13 +89,13 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
         .with_data(source)
         .with_exchange(exchange)
         .build();
-    
+
     let strat = StaticWeightStrategyBuilder::new()
         .with_brkr(brkr)
         .with_clock(Rc::clone(&clock))
         .with_weights(weights)
         .default();
-    
+
     let mut sim = SimContextBuilder::new()
         .with_clock(Rc::clone(&clock))
         .with_strategy(strat)
@@ -109,10 +108,10 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
+    use alator::clock::ClockBuilder;
     use rand::thread_rng;
     use rand_distr::{Distribution, Normal};
-    use alator::clock::ClockBuilder;
+    use std::collections::HashMap;
 
     use super::{alator_backtest, AlatorInput};
 

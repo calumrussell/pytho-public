@@ -3,13 +3,13 @@ pub mod data;
 pub mod sim;
 pub mod stat;
 
-use calcs::{DDInput, DDResults, max_dd_threshold_position};
+use calcs::{max_dd_threshold_position, DDInput, DDResults};
 use data::EodRawAntevortaInput;
-use wasm_bindgen::prelude::*;
 use std::panic;
+use wasm_bindgen::prelude::*;
 
-use sim::{AlatorInput, alator_backtest, AlatorResults};
-use sim::{AntevortaMultipleInput, AntevortaResults, antevorta_multiple};
+use sim::{alator_backtest, AlatorInput, AlatorResults};
+use sim::{antevorta_multiple, AntevortaMultipleInput, AntevortaResults};
 
 extern crate console_error_panic_hook;
 
