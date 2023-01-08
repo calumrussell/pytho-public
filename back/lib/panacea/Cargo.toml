@@ -20,3 +20,4 @@ serde-wasm-bindgen = "0.4"
 time = { version = "0.3.17", features = ["formatting", "macros", "parsing"] }
 web-sys = { version = "0.3.60", features = ["console"] }
 console_error_panic_hook = "0.1.7"
+smartcore = "0.3.0"

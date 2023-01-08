@@ -71,4 +71,5 @@ docs/_build/
 # Pyenv
 .python-version
 
-data.json
+mcd.json
+amzn.json
