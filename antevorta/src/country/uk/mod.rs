@@ -1,10 +1,11 @@
 pub mod flow;
-mod mutation;
 mod stack;
 mod tax;
 
+use self::flow::UKIncomeInternal;
 pub use self::tax::NIC;
 
+use alator::types::DateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
 use std::rc::Rc;
@@ -13,6 +14,7 @@ use alator::clock::Clock;
 use alator::types::CashValue;
 
 use crate::acc::CanTransfer;
+use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
@@ -22,7 +24,6 @@ use crate::strat::InvestmentStrategy;
 
 use flow::Flow;
 use flow::{Employment, EmploymentPAYE, Expense, PctOfIncomeExpense, Rental};
-use mutation::{CashBalanceStrategy, Mutations, TaxStrategy};
 use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
@@ -36,12 +37,12 @@ pub enum SimState {
 
 pub struct SimConstants {
     //Has to be ordered, tax has to be calculated first
-    pub start_mutations: Vec<Mutations>,
-    pub end_mutations: Vec<Mutations>,
     pub nic_group: NIC,
     pub annual_tax_schedule: Schedule,
     pub clock: Clock,
     pub contribution_pct: f64,
+    pub emergency_fund_minimum: f64,
+    pub source: HashMapSourceSim,
 }
 
 pub struct SimMutableState<S: InvestmentStrategy> {
@@ -91,15 +92,94 @@ impl UKSimulationResult {
     }
 }
 
-/*
- * Each loop we check for rebalance, check for tax year, and then check for
- * user-defined income events.
- */
+//Each loop we check for rebalance, check tax, and then check for user-defined income events.
 pub struct UKSimulationState<S: InvestmentStrategy>(
     pub SimConstants,
     pub SimMutableState<S>,
     pub SimLoopState,
 );
+
+impl<S: InvestmentStrategy> UKSimulationState<S> {
+    fn rebalance_cash(&mut self) {
+        let bank_bal = *self.1.bank.balance;
+        let excess_cash = bank_bal - self.0.emergency_fund_minimum;
+        if excess_cash > 0.0 {
+            self.1.bank.withdraw(&excess_cash);
+            //If we are over ISA deposit limit, invest what is possible then return the remainder
+            //which can go into GIA
+            let (_deposited, remainder) = self.1.isa.deposit_wrapper(&excess_cash);
+            if *remainder > 0.0 {
+                self.1.gia.deposit(&remainder);
+            }
+        }
+    }
+
+    fn pay_taxes(&mut self, curr_date: &DateTime) {
+        if self.1.annual_tax.check_bool(curr_date) {
+            //Inflation is annualized but with daily frequency, so we should always have an annual
+            //number
+            let inflation = self.0.source.get_current_inflation().unwrap();
+            let curr_config = &self.1.tax_config;
+            let new_config = curr_config.apply_inflation(&inflation);
+            self.1.tax_config = new_config.clone();
+
+            let mut capital_gains = 0.0;
+            let mut dividends_received = 0.0;
+
+            //Assumes that we are correctly calling this on the last day of the current tax year
+            if let Some(period_start) = self.0.annual_tax_schedule.last_period(curr_date) {
+                capital_gains += *self.1.gia.get_capital_gains(curr_date, &period_start);
+                dividends_received += *self.1.gia.get_dividends(curr_date, &period_start);
+            }
+
+            if capital_gains > 0.0 {
+                self 
+                    .1
+                    .annual_tax
+                    .add_income(UKIncomeInternal::OtherGains(CashValue::from(capital_gains)));
+            }
+
+            if dividends_received > 0.0 {
+                self
+                    .1
+                    .annual_tax
+                    .add_income(UKIncomeInternal::Dividend(CashValue::from(
+                        dividends_received,
+                    )));
+            }
+
+            let output = self.1.annual_tax.calc(&new_config);
+            let tax_due = output.total();
+            if let TransferResult::Failure = self.1.bank.withdraw(&tax_due) {
+                //Not enough cash in bank to pay taxes, liquidate cash accounts if there is still
+                //not enough then enter unrecoverable state which pauses all forward progress with
+                //simulation
+
+                let cash_value =
+                *self.1.gia.liquidation_value() + *self.1.isa.liquidation_value();
+                if cash_value < *tax_due {
+                    self.1.sim_state = SimState::Unrecoverable;
+                    //In unrecoverable state, zero all the accounts
+                    self.1.gia.zero();
+                    self.1.isa.zero();
+                    self.1.sipp.zero();
+                    self.1.bank.zero();
+                } else if *self.1.isa.liquidation_value() > *tax_due {
+                    self.1.isa.liquidate(&tax_due);
+                } else {
+                    let isa_value = self.1.isa.liquidation_value();
+                    self.1.isa.liquidate(&isa_value);
+                    let remainder = *tax_due - *isa_value;
+                    self.1.gia.liquidate(&remainder);
+                }
+            }
+            self.1.annual_tax = TaxPeriod::with_schedule(
+                self.0.annual_tax_schedule.clone(),
+                self.0.nic_group.clone(),
+            );
+        }
+    }
+}
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
     pub fn get_perf(&mut self) -> UKSimulationResult {
@@ -122,12 +202,10 @@ impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
                 self.1.sipp.check();
 
                 let curr_date = self.0.clock.borrow().now();
-                //Mutations should not be modified during the simulation
-                let cloned_start_mutations: Vec<Mutations> = self.0.start_mutations.to_vec();
-                for mutation in cloned_start_mutations {
-                    mutation.check(&curr_date, self)
-                }
 
+                self.rebalance_cash();
+                self.pay_taxes(&curr_date);
+        
                 self.1.isa.rebalance();
                 self.1.gia.rebalance();
                 self.1.sipp.rebalance();
@@ -142,11 +220,7 @@ impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
                 //self
                 self.1.flows = cloned_flows;
 
-                //Mutations should not be modified during the simulation
-                let cloned_end_mutations: Vec<Mutations> = self.0.end_mutations.to_vec();
-                for mutation in cloned_end_mutations {
-                    mutation.check(&curr_date, self)
-                }
+                self.rebalance_cash();
 
                 self.1.isa.finish();
                 self.1.gia.finish();
@@ -210,13 +284,6 @@ impl Config {
             panic!("Missing investment account");
         }
 
-        let cash_strategy =
-            Mutations::CashBalance(CashBalanceStrategy::new(&self.emergency_cash_min));
-        let tax_strategy = Mutations::TaxHashSource(TaxStrategy::new(src.clone()));
-
-        let start_mutations = vec![cash_strategy.clone(), tax_strategy];
-        let end_mutations = vec![cash_strategy];
-
         let flows: Vec<Flow> = self
             .flows
             .as_ref()
@@ -227,12 +294,12 @@ impl Config {
         let annual_tax_schedule = Schedule::EveryYear(1, 4);
 
         let constants = SimConstants {
-            start_mutations,
-            end_mutations,
             nic_group: self.nic,
             annual_tax_schedule: annual_tax_schedule.clone(),
             clock: Rc::clone(&clock),
             contribution_pct: self.contribution_pct,
+            emergency_fund_minimum: self.emergency_cash_min,
+            source: src.clone(),
         };
 
         let mutable = SimMutableState {

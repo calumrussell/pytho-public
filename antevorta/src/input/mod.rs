@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::{collections::HashMap, rc};
 use std::rc::Rc;
 
 use alator::{
@@ -13,13 +14,13 @@ use rand_distr::{Distribution, Normal};
 type SimDataRep = HashMap<DateTime, f64>;
 
 pub trait SimDataSource: Clone + DataSource {
-    fn get_current_inflation(&self) -> Option<&f64>;
-    fn get_current_interest_rate(&self) -> Option<&f64>;
-    fn get_current_house_price_return(&self) -> Option<&f64>;
+    fn get_current_inflation(&self) -> Option<f64>;
+    fn get_current_interest_rate(&self) -> Option<f64>;
+    fn get_current_house_price_return(&self) -> Option<f64>;
 }
 
 #[derive(Clone, Debug)]
-pub struct HashMapSourceSim {
+pub struct HashMapSourceSimInner {
     clock: Clock,
     inflation: SimDataRep,
     rates: SimDataRep,
@@ -28,27 +29,32 @@ pub struct HashMapSourceSim {
     dividends: DividendsHashMap,
 }
 
+#[derive(Clone, Debug)]
+pub struct HashMapSourceSim {
+    inner: Rc<RefCell<HashMapSourceSimInner>>
+}
+
 impl SimDataSource for HashMapSourceSim {
-    fn get_current_house_price_return(&self) -> Option<&f64> {
-        let now = self.clock.borrow().now();
-        self.house_price_rets.get(&now)
+    fn get_current_house_price_return(&self) -> Option<f64> {
+        let now = self.inner.borrow().clock.borrow().now();
+        self.inner.borrow().house_price_rets.get(&now).copied()
     }
 
-    fn get_current_inflation(&self) -> Option<&f64> {
-        let now = self.clock.borrow().now();
-        self.inflation.get(&now)
+    fn get_current_inflation(&self) -> Option<f64> {
+        let now = self.inner.borrow().clock.borrow().now();
+        self.inner.borrow().inflation.get(&now).copied()
     }
 
-    fn get_current_interest_rate(&self) -> Option<&f64> {
-        let now = self.clock.borrow().now();
-        self.rates.get(&now)
+    fn get_current_interest_rate(&self) -> Option<f64> {
+        let now = self.inner.borrow().clock.borrow().now();
+        self.inner.borrow().rates.get(&now).copied()
     }
 }
 
 impl DataSource for HashMapSourceSim {
     fn get_quote(&self, symbol: &str) -> Option<Quote> {
-        let curr_date = self.clock.borrow().now();
-        if let Some(quotes) = self.quotes.get(&curr_date) {
+        let curr_date = self.inner.borrow().clock.borrow().now();
+        if let Some(quotes) = self.inner.borrow().quotes.get(&curr_date) {
             for quote in quotes {
                 if quote.symbol.eq(symbol) {
                     return Some(quote.clone());
@@ -58,14 +64,14 @@ impl DataSource for HashMapSourceSim {
         None
     }
 
-    fn get_quotes(&self) -> Option<&Vec<Quote>> {
-        let curr_date = self.clock.borrow().now();
-        self.quotes.get(&curr_date)
+    fn get_quotes(&self) -> Option<Vec<Quote>> {
+        let curr_date = self.inner.borrow().clock.borrow().now();
+        self.inner.borrow().quotes.get(&curr_date).cloned()
     }
 
-    fn get_dividends(&self) -> Option<&Vec<Dividend>> {
-        let curr_date = self.clock.borrow().now();
-        self.dividends.get(&curr_date)
+    fn get_dividends(&self) -> Option<Vec<Dividend>> {
+        let curr_date = self.inner.borrow().clock.borrow().now();
+        self.inner.borrow().dividends.get(&curr_date).cloned()
     }
 }
 
@@ -78,14 +84,18 @@ impl HashMapSourceSim {
         quotes: QuotesHashMap,
         dividends: DividendsHashMap,
     ) -> Self {
-        Self {
+        let tmp = HashMapSourceSimInner {
             clock,
             inflation,
             rates,
             house_price_rets,
             quotes,
             dividends,
+        };
+        Self {
+            inner: Rc::new(RefCell::new(tmp)),
         }
+
     }
 }
 

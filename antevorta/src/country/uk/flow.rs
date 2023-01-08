@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
-use crate::input::{HashMapSourceSim, SimDataSource};
+use crate::input::{SimDataSource, HashMapSourceSim};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -17,7 +17,7 @@ trait WillFlow<S: InvestmentStrategy> {
 }
 
 #[derive(Clone)]
-pub enum Flow {
+pub enum Flow{
     Employment(Employment),
     EmploymentStaticGrowth(StaticGrowth, Employment),
     EmploymentFixedGrowth(FixedGrowth, Employment),
