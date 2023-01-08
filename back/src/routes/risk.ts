@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { EodSource, Issuer } from '../api';
-import { regression, regressions, RegressionResult, RegressionResults } from "../common";
 import { errorSchema } from "./error";
+import { risk } from '../../lib/panacea/pkg/panacea';
 
 interface RiskRequestQuerystring {
   ind: Array<number>,
@@ -13,24 +13,11 @@ type RiskRequest = FastifyRequest<{
   Querystring: RiskRequestQuerystring,
 }>;
 
-interface CoreRegressionResult {
-  regression: RegressionResult,
-  avgs: Array<number>,
-}
-
-interface RollingRegressionResult {
-  regressions: RegressionResults,
-  dates: Array<number>,
-}
-
-interface RiskResult {
+interface RiskInput {
   dep: number,
   ind: Array<number>,
-  min_date: number,
-  max_date: number,
-  core: CoreRegressionResult,
-  rolling: RollingRegressionResult,
-};
+  data: Array<Array<EodSource.Row>>,
+}
 
 export const handler = (fastify: FastifyInstance) => async (request: RiskRequest, reply: FastifyReply) => {
   const {
@@ -44,7 +31,7 @@ export const handler = (fastify: FastifyInstance) => async (request: RiskRequest
       throw Error("Missing issuer");
     }
     const assetTickers = assetIssuers.value.map((res: Issuer.Row) => res.ticker);
-    const data = await EodSource.getPrices(assetTickers);
+    const data = await EodSource.getPricesFlat(assetTickers);
     if (data._tag === "None") {
       throw Error("Missing data");
     }
@@ -54,62 +41,13 @@ export const handler = (fastify: FastifyInstance) => async (request: RiskRequest
       throw Error("Missing data");
     }
 
-    let mergedData = data.value.mergeOnDate(0);
-
-    const monthlyReturns = mergedData.toMonthly().getReturns();
-    const depData: Array<Array<number>> = [];
-    const indData: Array<Array<number>> = [];
-    monthlyReturns.forEach((value, _key) => {
-      const [first, ...last] = value;
-      depData.push([first]);
-      indData.push(last);
-    });
-
-    const avgsHolder = new Array(assetTickers.length).fill(0);
-    const sum = [...monthlyReturns.values()].reduce((acc, curr) => {
-      return curr.map((c, i) => c + acc[i]);
-    }, avgsHolder);
-    const avgs = sum.map(s => parseFloat((s / depData.length).toFixed(2)));
-
-    const coreRes = {
-      regression: regression(depData, indData),
-      avgs,
-    };
-
-    let rollingData = mergedData.toMonthly().convertToRolling(6);
-    let rollingDates: Array<number> = [];
-    const rollingDep: Array<Array<Array<number>>> = [];
-    const rollingInd: Array<Array<Array<number>>> = [];
-    
-    rollingData.forEach((table, _key) => {
-      const t0: Array<Array<number>> = [];
-      const t1: Array<Array<number>> = [];
-
-
-      [...table.getReturns().values()].forEach(value => {
-        const [first, ...last] = value;
-        t0.push([first]);
-        t1.push(last);
-      });
-      rollingDep.push(t0);
-      rollingInd.push(t1);
-      rollingDates.push(table.getLastDate());
-    });
-
-    const rollingReg = regressions(rollingDep, rollingInd);
-    const rollingRes: RollingRegressionResult = {
-      regressions: rollingReg,
-      dates: rollingDates,
-    };
-
-    const result: RiskResult = {
+    let input: RiskInput = {
       dep,
       ind,
-      min_date: mergedData.getFirstDate(),
-      max_date: mergedData.getLastDate(),
-      core: coreRes,
-      rolling: rollingRes,
+      data: data.value,
     };
+
+    let result = risk(input);
     return reply.status(200).send({data: result});
   } catch(e: unknown) {
     console.log(e);

@@ -21,8 +21,13 @@ pub struct CoreResult {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RollingRegressionResult {
+    coefs: Vec<Vec<f64>>
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RollingResult {
-    regressions: Vec<RegressionResult>,
+    regressions: RollingRegressionResult,
     dates: Vec<i64>,
 }
 
@@ -131,21 +136,22 @@ fn build_rolling(
     let mut regressions = Vec::new();
 
     for i in 0..periods {
-        let dependent = rolling_rets.get(0).unwrap().get(i).unwrap();
+        let dependent = rolling_rets.get(0).unwrap().get(i).unwrap().iter().map(|v| v * 100.0).collect();
         let mut independent: Vec<Vec<f64>> = Vec::new();
         for j in 0..rolling_window {
             let mut row: Vec<f64> = Vec::new();
             for k in rolling_rets.iter().skip(1) {
-                row.push(*k.get(i).unwrap().get(j).unwrap());
+                row.push(*k.get(i).unwrap().get(j).unwrap() * 100.0);
             }
             independent.push(row);
         }
 
-        regressions.push(regression(&independent, &dependent));
+        let res = regression(&independent, &dependent);
+        regressions.push(res.coefs);
     }
 
     RollingResult {
-        regressions,
+        regressions: RollingRegressionResult { coefs: regressions },
         dates: rolling_dates,
     }
 }
@@ -158,17 +164,17 @@ fn build_core(
     let mut avg_rets = Vec::new();
     for rets in filtered_rets {
         let ret_sum: f64 = rets.clone().iter().sum();
-        avg_rets.push(ret_sum / rets.len() as f64);
+        avg_rets.push((ret_sum / rets.len() as f64)*100.0);
     }
 
-    let y: Vec<f64> = filtered_rets.first().unwrap().to_vec();
+    let y: Vec<f64> = filtered_rets.first().unwrap().to_vec().iter().map(|v| v* 100.0).collect();
     let mut x: Vec<Vec<f64>> = Vec::new();
     //Transpose independent variables
     //We deduct two because we lose the first date when calculating first period return
     for i in 0..monthly_dates.len() - 2 {
         let mut tmp = Vec::new();
         for j in filtered_rets.iter().skip(1) {
-            tmp.push(j[i].clone());
+            tmp.push(j[i]* 100.0);
         }
         x.push(tmp);
     }

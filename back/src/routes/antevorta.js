@@ -13,23 +13,10 @@ const handler = (fastify) => async (request, reply) => {
             throw Error("Missing issuer");
         }
         const assetTickers = assetIssuers.value.map((res) => res.ticker);
-        const assetData = await api_1.EodSource.getPrices(assetTickers);
+        const assetData = await api_1.EodSource.getPricesFlat(assetTickers);
         if (assetData._tag === "None" || assetData.value.length === 0) {
             throw Error("Missing data for issuer");
         }
-        const mergedData = assetData.value.mergeOnSource(assets);
-        const dates = assetData.value.getOverlappingDates();
-        if (dates._tag === "None") {
-            throw Error("No dates");
-        }
-        if (dates.value.length === 0) {
-            throw Error("No overlapping dates");
-        }
-        const closeData = new Map();
-        mergedData.forEach((value, key) => {
-            //Because we haven't merged, this will only return one series
-            closeData.set(key.toString(), [...value.getAdjustedClose().values()].flat());
-        });
         let mappedWeights = new Map();
         weights.forEach((weight, i) => {
             mappedWeights.set(assets[i].toString(), Number(weight));
@@ -37,14 +24,12 @@ const handler = (fastify) => async (request, reply) => {
         const input = {
             assets: assets.map(a => a.toString()),
             weights: mappedWeights,
-            dates: dates.value,
-            close: closeData,
+            close: assetData.value,
             sim_length,
             runs,
             config: sim_config,
         };
         let res = { data: (0, panacea_1.antevorta)(input) };
-        console.log(res);
         return reply.send(res);
     }
     catch (e) {

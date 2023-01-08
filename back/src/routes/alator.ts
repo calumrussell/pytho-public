@@ -16,9 +16,7 @@ type AlatorRequest = FastifyRequest<{
 interface AlatorInput {
   assets: Array<string>,
   weights: Map<string, number>,
-  data: Map<number, Array<number>>,
-  first_date: number,
-  last_date: number,
+  data: Array<Array<EodSource.Row>>,
 }
 
 export const handler = (fastify: FastifyInstance) => async (request: AlatorRequest, reply: FastifyReply) => {
@@ -33,12 +31,11 @@ export const handler = (fastify: FastifyInstance) => async (request: AlatorReque
       throw Error("Missing issuer");
     }
     const assetTickers = assetIssuers.value.map((res: Issuer.Row) => res.ticker);
-    const assetData = await EodSource.getPrices(assetTickers);
+    const assetData = await EodSource.getPricesFlat(assetTickers);
     if (assetData._tag === "None") {
       throw Error("Missing data for issuer");
     }
 
-    const mergedData = assetData.value.mergeOnDate(0);
     let mappedWeights = new Map();
     weights.forEach((weight, i) => {
       mappedWeights.set(assets[i].toString(), Number(weight));
@@ -47,9 +44,7 @@ export const handler = (fastify: FastifyInstance) => async (request: AlatorReque
     const alatorInput: AlatorInput = {
       assets: assets.map(v => v.toString()),
       weights: mappedWeights,
-      data: mergedData.getAdjustedClose(),
-      first_date: mergedData.getFirstDate(),
-      last_date: mergedData.getLastDate(),
+      data: assetData.value,
     };
 
     const result = backtest(alatorInput);

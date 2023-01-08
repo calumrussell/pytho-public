@@ -20,8 +20,6 @@
     "fastify-plugin": "^4.3.0",
     "lodash.unzip": "^3.4.0",
     "lodash.zip": "^4.2.0",
-    "ml-regression-multivariate-linear": "^2.0.4",
-    "ml-regression-simple-linear": "^2.0.3",
     "pg": "^8.8.0"
   },
   "devDependencies": {
