@@ -150,10 +150,10 @@ const reducer = (
     }
     case 'updateVar': {
       enum validOptions {
-        contribution_pct = 'contribution_pct',
-        emergency_cash_min = 'emergency_cash_min',
-        starting_cash = 'starting_cash',
-        lifetime_pension_contributions = 'lifetime_pension_contributions',
+        contribution_pct = "contribution_pct",
+        lifetime_pension_contributions = "lifetime_pension_contributions",
+        starting_cash = "starting_cash",
+        emergency_cash_min = "emergency_cash_min",
       }
 
       if (action.name in validOptions) {
