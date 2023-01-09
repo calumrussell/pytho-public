@@ -142,8 +142,7 @@ export namespace Issuer {
 
   export const suggestIssuer = async (fastify: FastifyInstance, suggest: string): Promise<Option<Array<Row>>> => {
     try {
-      let formattedString = `%${suggest.toLowerCase()}%`; 
-      const { rows } = await fastify.query(queryBuilder.suggestIssuer(), [formattedString]);
+      const { rows } = await fastify.query(queryBuilder.suggestIssuer(), [suggest]);
       return some(rows);
     } catch (e) {
       console.log(e);

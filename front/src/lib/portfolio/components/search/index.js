@@ -42,7 +42,7 @@ export const PortfolioSearch = (props) => {
   const searchSecurityFunc = (input) => {
     const value = input.value;
     const url =
-        `/suggest?s=${value}`;
+        `/suggest?s=${encodeURIComponent(value)}`;
     const copy = {
       ...input,
       url,

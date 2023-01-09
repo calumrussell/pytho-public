@@ -123,8 +123,7 @@ var Issuer;
     };
     Issuer.suggestIssuer = async (fastify, suggest) => {
         try {
-            let formattedString = `%${suggest.toLowerCase()}%`;
-            const { rows } = await fastify.query(db_1.queryBuilder.suggestIssuer(), [formattedString]);
+            const { rows } = await fastify.query(db_1.queryBuilder.suggestIssuer(), [suggest]);
             return (0, common_1.some)(rows);
         }
         catch (e) {

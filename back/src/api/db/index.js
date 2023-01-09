@@ -19,7 +19,7 @@ const innerDB = (fastify, _opts, done) => {
 const db = (0, fastify_plugin_1.default)(innerDB);
 exports.db = db;
 const suggestIssuer = () => {
-    return "select * from api_coverage where lower(name) like $1";
+    return "select * from api_coverage where to_tsvector('english', issuer) @@ plainto_tsquery('english', $1) or to_tsvector('english', ticker) @@ plainto_tsquery('english', $1);";
 };
 const getIssuer = () => {
     return "select * from api_coverage where id=$1";
