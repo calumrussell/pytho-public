@@ -2,7 +2,7 @@ import requests
 import zipfile
 import pandas as pd
 import io
-
+import psycopg2
 
 class FFDat:
     def dat_to_df(self, csv, headers=None):
@@ -439,15 +439,24 @@ datasets = [
     FFInternationalCountriesMonthlyData,
 ]
 
-def insert_flow(o):
+def insert_flow(o, conn):
     print(o)
     ff = o()
     d = ff.df.to_dict("records")
-    frs = [FactorReturns(**i) for i in d]
-    FactorReturns.objects.bulk_create(frs, ignore_conflicts=True)
+    with conn:
+        with conn.cursor() as curs:
+            for row in d:
+                stmt = f"insert into ff_factors(factor, period, ret, name, period_name) values('{row['factor']}',{row['period']},{row['ret']},'{row['name']}','{row['period_name']}') on conflict(period_name) do nothing;" 
+                curs.execute(stmt)
     return
 
 
 if __name__ == "__main__":
-    [insert_flow(d) for d in datasets]
-    return
+
+    conn = psycopg2.connect(
+        dbname="pytho",
+        user="calum",
+        password="2delEuhh5ykYJYEaNCXKkg",
+        host="work",
+        port=14102)
+    [insert_flow(d, conn) for d in datasets]
