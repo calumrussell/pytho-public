@@ -137,7 +137,7 @@ export const PlanState = () => {
             value={ state.contribution_pct }
             onChange={
               (ev: React.ChangeEvent<HTMLInputElement>) =>
-                changeHandler(ev, 'contributionPct')
+                changeHandler(ev, 'contribution_pct')
             } />
           <FormLabel
             htmlFor="metis-state-emergencycash">
@@ -154,7 +154,7 @@ export const PlanState = () => {
             value={ state.emergency_cash_min }
             onChange={
               (ev: React.ChangeEvent<HTMLInputElement>) =>
-                changeHandler(ev, 'emergencyCashMin')
+                changeHandler(ev, 'emergency_cash_min')
             } />
           <FormLabel
             htmlFor="metis-state-lifetimepensionconts">
@@ -171,7 +171,7 @@ export const PlanState = () => {
             value={ state.lifetime_pension_contributions }
             onChange={
               (ev: React.ChangeEvent<HTMLInputElement>) =>
-                changeHandler(ev, 'lifetimePensionContributions')
+                changeHandler(ev, 'lifetime_pension_contributions')
             } />
           <FormLabel
             htmlFor="metis-state-startingcash">
@@ -188,7 +188,7 @@ export const PlanState = () => {
             value={ state.starting_cash }
             onChange={
               (ev: React.ChangeEvent<HTMLInputElement>) =>
-                changeHandler(ev, 'startingCash')
+                changeHandler(ev, 'starting_cash')
             } />
 
         </FormWrapper>
