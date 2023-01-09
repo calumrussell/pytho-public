@@ -30,6 +30,7 @@ import {
 import {
   useAntevorta,
 } from '../../reducers/antevorta';
+import { AxiosError } from "axios";
 
 interface ModelInputProps {
   selectedPlanPos: number,
@@ -66,12 +67,6 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
       toggleLoader,
     } = useLoader();
 
-    const errFunc = (err: string) => errorMessage(err);
-    //Does nothing, but may be needed later
-    const finallyFunc = () => {
-      setDisabledState(false);
-      toggleLoader();
-    };
 
     const {
       displayPortfolio,
@@ -97,7 +92,18 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
       ev: React.MouseEvent<HTMLButtonElement>) => {
         ev.preventDefault();
         setDisabledState(true);
-        toggleLoader();
+        const stop = toggleLoader();
+
+        const errFunc = (err: AxiosError) => {
+          errorMessage(err.message);
+          stop();
+        };
+
+        const finallyFunc = () => {
+          setDisabledState(false);
+          stop();
+        };
+
         simRequest(runnerInput, runs, errFunc, finallyFunc);
     };
 

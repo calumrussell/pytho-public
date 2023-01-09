@@ -31,7 +31,6 @@ export const ModelResults = (props) => {
   } = results;
 
   if (core != undefined && rolling != undefined) {
-    console.log(results);
     return (
       <SectionWrapper
         data-testid="riskattribution-modelresults">
