@@ -100,6 +100,11 @@ export const PortfolioSearch = (props) => {
           light>
           Asset
         </Text>
+        <Text
+          light
+          italic>
+          Can search by asset name or ticker. Ticker format shown in results.
+        </Text>
       </FormLabel>
       <AutoSuggest
         id="portfoliosearch-asset"
