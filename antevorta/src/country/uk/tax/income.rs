@@ -88,7 +88,11 @@ fn personal_savings_allowance(
     }
 }
 
-fn starting_savings_allowance(savings_income: &f64, total_income: &f64, config: &UKTaxConfig) -> CashValue {
+fn starting_savings_allowance(
+    savings_income: &f64,
+    total_income: &f64,
+    config: &UKTaxConfig,
+) -> CashValue {
     let allowance = *config.starting_savings_allowance_band;
     let threshold = *config.personal_allowance_band + allowance;
 
@@ -178,13 +182,18 @@ impl IncomeTax {
             personal_savings_allowance(&savings_income, basic, higher, additional, config);
         let self_employment_allowance = self_employment_allowance(&self_employment_income, config);
         let rental_allowance = rental_allowance(&rental_income, config);
-        let starting_savings_allowance = starting_savings_allowance(&savings_income, &total_income, config);
-        CashValue::from(*saving_allowance + *self_employment_allowance + *rental_allowance + *starting_savings_allowance)
+        let starting_savings_allowance =
+            starting_savings_allowance(&savings_income, &total_income, config);
+        CashValue::from(
+            *saving_allowance
+                + *self_employment_allowance
+                + *rental_allowance
+                + *starting_savings_allowance,
+        )
     }
 
     pub fn taxable_income(period: &TaxPeriod) -> CashValue {
         let total_income = period.income();
-        //Contribution won't be invalid because rules are encoded
         //in SIPP account, and we only pass contribution after we are
         //sure that it can be deposited into account with breaking limits
         let total_contributions = period.contributions();
@@ -218,7 +227,11 @@ impl PAYEIncomeTax {
 pub struct DividendTax;
 
 impl DividendTax {
-    pub fn calc(period: &TaxPeriod, income_tax: &IncomeTaxOutput, config: &UKTaxConfig) -> CashValue {
+    pub fn calc(
+        period: &TaxPeriod,
+        income_tax: &IncomeTaxOutput,
+        config: &UKTaxConfig,
+    ) -> CashValue {
         let dividend = period.dividend();
 
         let allowance = *config.dividend_allowance_band;
@@ -281,13 +294,11 @@ mod tests {
         assert!(*a == 0.0);
 
         //Higher rate taxpayer with savings income should generate allowance
-        let a1 =
-            personal_savings_allowance(&1_000.0, &1_000.0, &1_000.0, &0.0, &config);
+        let a1 = personal_savings_allowance(&1_000.0, &1_000.0, &1_000.0, &0.0, &config);
         assert!(*a1 != 0.0);
 
         //Basic rate taxpayer with savings income should generate allowance
-        let a2 =
-            personal_savings_allowance(&1_000.0, &1_000.0, &0.0, &0.0, &config);
+        let a2 = personal_savings_allowance(&1_000.0, &1_000.0, &0.0, &0.0, &config);
         assert!(*a2 != 0.0);
     }
 }

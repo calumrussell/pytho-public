@@ -1,12 +1,13 @@
 use alator::broker::{
-    BrokerCalculations, DividendPayment, Trade, BacktestBroker, TransferCash, EventLog, BrokerCashEvent,
+    BacktestBroker, BrokerCalculations, BrokerCashEvent, DividendPayment, EventLog, Trade,
+    TransferCash,
 };
 use alator::clock::Clock;
-use alator::input::HashMapInput;
 use alator::sim::SimulatedBroker;
 use alator::strategy::{Strategy, StrategyEvent, TransferFrom, TransferTo};
 use alator::types::{CashValue, PortfolioAllocation};
 
+use crate::input::HashMapSourceSim;
 use crate::schedule::Schedule;
 
 //[InvestmentStrategy] supplements the [Strategy] provided by alator with methods that are relevant
@@ -21,11 +22,15 @@ pub trait InvestmentStrategy: Clone + Strategy + TransferFrom + TransferTo {
     fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment>;
     fn check(&mut self);
     fn finish(&mut self);
+    //Special method to completely zero, required when client has hit some external liquidation
+    //condition outside the lifecycle of the broker, should not be called within normal trading
+    //cycle
+    fn zero(&mut self);
 }
 
 #[derive(Clone)]
 pub struct StaticInvestmentStrategy {
-    brkr: SimulatedBroker<HashMapInput>,
+    brkr: SimulatedBroker<HashMapSourceSim>,
     rebalance_schedule: Schedule,
     target_weights: PortfolioAllocation,
     clock: Clock,
@@ -101,11 +106,17 @@ impl InvestmentStrategy for StaticInvestmentStrategy {
     fn finish(&mut self) {
         self.brkr.finish();
     }
+
+    fn zero(&mut self) {
+        //Effectively zeros the account balance, does not need to be called on brokers where there
+        //can be called by clients with a liability beyond cash balance.
+        self.withdraw_cash_with_liquidation(&self.brkr.get_liquidation_value());
+    }
 }
 
 impl StaticInvestmentStrategy {
     pub fn new(
-        brkr: SimulatedBroker<HashMapInput>,
+        brkr: SimulatedBroker<HashMapSourceSim>,
         rebalance_schedule: Schedule,
         target_weights: PortfolioAllocation,
         clock: Clock,

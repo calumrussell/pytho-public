@@ -1,13 +1,8 @@
-use alator::broker::Quote;
-use alator::clock::{Clock, ClockBuilder};
+use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
-use alator::input::{HashMapInput, HashMapInputBuilder, QuotesHashMap};
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
 use antevorta::input::FakeHashMapSourceSim;
-use rand::thread_rng;
-use rand_distr::{Distribution, Normal};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use antevorta::country::uk::Config;
@@ -15,43 +10,11 @@ use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 
-fn build_data(clock: Clock) -> HashMapInput {
-    let mut rng = thread_rng();
-    let ret_dist = Normal::new(0.02, 0.1).unwrap();
-
-    let mut fake_data: QuotesHashMap = HashMap::new();
-    let mut price_abc = 100.0;
-    let mut price_bcd = 100.0;
-    for date in clock.borrow().peek() {
-        let q_abc = Quote::new(
-            price_abc,
-            price_abc,
-            date.clone(),
-            "ABC"
-        );
-        let q_bcd = Quote::new(
-            price_bcd,
-            price_bcd,
-            date.clone(),
-            "BCD"
-        );
-        fake_data.insert(date.into(), vec![q_abc, q_bcd]);
-        price_abc += price_abc * (1.0 + ret_dist.sample(&mut rng));
-        price_bcd += price_bcd * (1.0 + ret_dist.sample(&mut rng));
-    }
-    let source = HashMapInputBuilder::new()
-        .with_quotes(fake_data)
-        .with_clock(clock)
-        .build();
-    source
-}
-
 #[test]
 fn sim_test() {
     let clock = ClockBuilder::with_length_in_dates(1, 100)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
-    let source = build_data(Rc::clone(&clock));
     let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
@@ -60,12 +23,12 @@ fn sim_test() {
 
     let exchange = DefaultExchangeBuilder::new()
         .with_clock(Rc::clone(&clock))
-        .with_data_source(source.clone())
+        .with_data_source(src.clone())
         .build();
 
     let brkr = SimulatedBrokerBuilder::new()
         .with_exchange(exchange)
-        .with_data(source)
+        .with_data(src.clone())
         .build();
 
     let strat = StaticInvestmentStrategy::new(
@@ -107,7 +70,9 @@ fn sim_test() {
         ]
     }"#;
 
-    let sim = Config::parse(config).unwrap().create(Rc::clone(&clock), strat, src);
+    let sim = Config::parse(config)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, src);
     let mut runner = SimRunner {
         clock: Rc::clone(&clock),
         state: sim,

@@ -2,9 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.schema = exports.handler = void 0;
 const api_1 = require("../api");
-const common_1 = require("../common");
 const error_1 = require("./error");
-;
+const panacea_1 = require("../../lib/panacea/pkg/panacea");
 ;
 const handler = (fastify) => async (request, reply) => {
     const { ind, dep, } = request.query;
@@ -14,7 +13,7 @@ const handler = (fastify) => async (request, reply) => {
             throw Error("Missing issuer");
         }
         const assetTickers = assetIssuers.value.map((res) => res.ticker);
-        const data = await api_1.EodSource.getPrices(assetTickers);
+        const data = await api_1.EodSource.getPricesFlat(assetTickers);
         if (data._tag === "None") {
             throw Error("Missing data");
         }
@@ -22,53 +21,12 @@ const handler = (fastify) => async (request, reply) => {
         if (data.value.length != [dep, ...ind].length) {
             throw Error("Missing data");
         }
-        let mergedData = data.value.mergeOnDate(0);
-        const monthlyReturns = mergedData.toMonthly().getReturns();
-        const depData = [];
-        const indData = [];
-        monthlyReturns.forEach((value, _key) => {
-            const [first, ...last] = value;
-            depData.push([first]);
-            indData.push(last);
-        });
-        const avgsHolder = new Array(assetTickers.length).fill(0);
-        const sum = [...monthlyReturns.values()].reduce((acc, curr) => {
-            return curr.map((c, i) => c + acc[i]);
-        }, avgsHolder);
-        const avgs = sum.map(s => parseFloat((s / depData.length).toFixed(2)));
-        const coreRes = {
-            regression: (0, common_1.regression)(depData, indData),
-            avgs,
-        };
-        let rollingData = mergedData.toMonthly().convertToRolling(6);
-        let rollingDates = [];
-        const rollingDep = [];
-        const rollingInd = [];
-        rollingData.forEach((table, _key) => {
-            const t0 = [];
-            const t1 = [];
-            [...table.getReturns().values()].forEach(value => {
-                const [first, ...last] = value;
-                t0.push([first]);
-                t1.push(last);
-            });
-            rollingDep.push(t0);
-            rollingInd.push(t1);
-            rollingDates.push(table.getLastDate());
-        });
-        const rollingReg = (0, common_1.regressions)(rollingDep, rollingInd);
-        const rollingRes = {
-            regressions: rollingReg,
-            dates: rollingDates,
-        };
-        const result = {
+        let input = {
             dep,
             ind,
-            min_date: mergedData.getFirstDate(),
-            max_date: mergedData.getLastDate(),
-            core: coreRes,
-            rolling: rollingRes,
+            data: data.value,
         };
+        let result = (0, panacea_1.risk)(input);
         return reply.status(200).send({ data: result });
     }
     catch (e) {

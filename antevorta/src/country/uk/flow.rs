@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
-use crate::input::{HashMapSourceSim, SimDataSource};
+use crate::input::{SimDataSource, HashMapSourceSim};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
-use super::UKSimulationState;
 use super::tax::{TaxPeriod, UKTaxableIncome};
+use super::UKSimulationState;
 
 trait WillFlow<S: InvestmentStrategy> {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>);
@@ -17,7 +17,7 @@ trait WillFlow<S: InvestmentStrategy> {
 }
 
 #[derive(Clone)]
-pub enum Flow {
+pub enum Flow{
     Employment(Employment),
     EmploymentStaticGrowth(StaticGrowth, Employment),
     EmploymentFixedGrowth(FixedGrowth, Employment),
@@ -201,7 +201,12 @@ impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
             let contribution = *self.value * state.0.contribution_pct;
             let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
             state.1.annual_tax.add_contribution(&contributed);
-            let paye_paid = TaxPeriod::paye(&self.value, &contributed, state.0.nic_group, &state.1.tax_config);
+            let paye_paid = TaxPeriod::paye(
+                &self.value,
+                &contributed,
+                state.0.nic_group,
+                &state.1.tax_config,
+            );
             state.1.annual_tax.add_paye_paid(&paye_paid.total());
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
             state.2.paid_income(&net_pay);
@@ -343,8 +348,8 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
-                let expense_value = self.pct * f64::from(*state.2.income_paid);
-                state.1.bank.withdraw(&expense_value.into());
+                let expense_value = self.pct * *state.2.income_paid;
+                state.1.bank.withdraw(&expense_value);
             }
         }
     }

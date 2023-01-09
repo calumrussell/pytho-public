@@ -86,7 +86,7 @@ pub fn max_dd_threshold_position(input: DDInput) -> DDResults {
 
 #[cfg(test)]
 mod tests {
-    use super::{DDInput, max_dd_threshold_position};
+    use super::{max_dd_threshold_position, DDInput};
     #[test]
     fn run_threshold() {
         let input = DDInput {

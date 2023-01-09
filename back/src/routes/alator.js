@@ -13,11 +13,10 @@ const handler = (fastify) => async (request, reply) => {
             throw Error("Missing issuer");
         }
         const assetTickers = assetIssuers.value.map((res) => res.ticker);
-        const assetData = await api_1.EodSource.getPrices(assetTickers);
+        const assetData = await api_1.EodSource.getPricesFlat(assetTickers);
         if (assetData._tag === "None") {
             throw Error("Missing data for issuer");
         }
-        const mergedData = assetData.value.mergeOnDate(0);
         let mappedWeights = new Map();
         weights.forEach((weight, i) => {
             mappedWeights.set(assets[i].toString(), Number(weight));
@@ -25,9 +24,7 @@ const handler = (fastify) => async (request, reply) => {
         const alatorInput = {
             assets: assets.map(v => v.toString()),
             weights: mappedWeights,
-            data: mergedData.getAdjustedClose(),
-            first_date: mergedData.getFirstDate(),
-            last_date: mergedData.getLastDate(),
+            data: assetData.value,
         };
         const result = (0, panacea_1.backtest)(alatorInput);
         //Need to size up decimals

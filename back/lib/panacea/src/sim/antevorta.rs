@@ -1,22 +1,73 @@
+use crate::eod::{EodRow, EodRawCommon};
 use crate::stat::build_sample_raw_daily;
+use alator::broker::Quote;
 use alator::clock::ClockBuilder;
-use alator::broker::{Dividend, Quote};
 use alator::exchange::DefaultExchangeBuilder;
-use alator::input::HashMapInputBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::input::FakeHashMapSourceSim;
+use antevorta::country::uk::Config;
+use antevorta::input::FakeHashMapSourceSimWithQuotes;
 use antevorta::schedule::Schedule;
 use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
-use antevorta::country::uk::Config;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::rc::Rc;
 use std::fmt;
-use serde::{Deserialize, Serialize};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EodRawAntevortaInput {
+    pub assets: Vec<String>,
+    pub close: Vec<Vec<EodRow>>,
+    pub weights: HashMap<String, f64>,
+    pub sim_length: i64,
+    pub runs: i64,
+    pub config: String,
+}
+
+impl EodRawAntevortaInput {
+    fn build_map(&self, intersection: &Vec<String>) -> AntevortaPriceInput {
+        let mut res = AntevortaPriceInput::new();
+        for (ticker, prices) in self.assets.iter().zip(&self.close) {
+            for row in prices {
+                if intersection.contains(&row.date) {
+                    let ticker_str = ticker.to_string();
+                    if res.contains_key(&ticker_str) {
+                        let curr = res.get_mut(&ticker_str).unwrap();
+                        curr.push(row.adjusted_close);
+                    } else {
+                        let prices = vec![row.adjusted_close];
+                        res.insert(ticker_str, prices);
+                    }
+                }
+            }
+        }
+        res
+    }
+}
+
+impl From<EodRawAntevortaInput> for AntevortaMultipleInput {
+    fn from(value: EodRawAntevortaInput) -> Self {
+        let dates = EodRawCommon::dates_intersect(&value.close);
+        let mut epoch_dates = EodRawCommon::convert_dates_to_epoch(&dates);
+        epoch_dates.sort();
+        let close = value.build_map(&dates);
+
+        Self {
+            weights: value.weights,
+            close,
+            dates: epoch_dates,
+            assets: value.assets,
+            sim_length: value.sim_length,
+            runs: value.runs,
+            config: value.config,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct AntevortaInsufficientDataError;
 
 impl fmt::Display for AntevortaInsufficientDataError {
@@ -27,12 +78,14 @@ impl fmt::Display for AntevortaInsufficientDataError {
 
 impl Error for AntevortaInsufficientDataError {}
 
+pub type AntevortaPriceInput = HashMap<String, Vec<f64>>;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaMultipleInput {
     pub assets: Vec<String>,
     pub weights: HashMap<String, f64>,
     pub dates: Vec<i64>,
-    pub close: HashMap<String, Vec<f64>>,
+    pub close: AntevortaPriceInput,
     pub sim_length: i64,
     pub runs: i64,
     //We wait to convert to SimulationState until we are inside the creation loop
@@ -44,13 +97,20 @@ pub struct AntevortaResults {
     pub values: Vec<f64>,
 }
 
-pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResults, Box<dyn Error>> {
+pub fn antevorta_multiple(
+    input: AntevortaMultipleInput,
+) -> Result<AntevortaResults, Box<dyn Error>> {
     //Date inputs is misleading, we only use the start_date to resample from
-    let start_date = input.dates.first().unwrap().clone();
-    let sim_length = (input.sim_length * 365) as i64;
-    let mut res: Vec<f64> = Vec::new();
-    for _i in 0..input.runs {
-        let clock = ClockBuilder::with_length_in_days(start_date, sim_length-1)
+    type SimResults = Arc<Mutex<Vec<f64>>>;
+    let res: SimResults = Arc::new(Mutex::new(Vec::new()));
+
+    let run_func = |input: AntevortaMultipleInput,
+                    results: SimResults|
+     -> Result<_, Box<dyn Error + Send + Sync>> {
+        let start_date = input.dates.first().unwrap().clone();
+        let sim_length = (input.sim_length * 365) as i64;
+
+        let clock = ClockBuilder::with_length_in_days(start_date, sim_length - 1)
             .with_frequency(&alator::types::Frequency::Daily)
             .build();
 
@@ -65,12 +125,7 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
                 for asset in &input.assets {
                     let asset_closes = resampled_close.get(asset).unwrap();
                     let pos_close = asset_closes[pos as usize];
-                    let q = Quote::new(
-                        pos_close,
-                        pos_close,
-                        date.clone(),
-                        asset,
-                    );
+                    let q = Quote::new(pos_close, pos_close, date.clone(), asset);
                     quotes.push(q);
                 }
                 raw_data.insert(date.into(), quotes);
@@ -79,13 +134,8 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
         } else {
             return Err(Box::new(AntevortaInsufficientDataError));
         }
-        let raw_dividends: HashMap<DateTime, Vec<Dividend>> = HashMap::new();
-        let source = HashMapInputBuilder::new()
-            .with_quotes(raw_data)
-            .with_dividends(raw_dividends)
-            .with_clock(Rc::clone(&clock))
-            .build();
-        let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
+
+        let src = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), raw_data);
 
         let mut weights = PortfolioAllocation::new();
         for symbol in input.weights.keys() {
@@ -94,20 +144,16 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
 
         let exchange = DefaultExchangeBuilder::new()
             .with_clock(Rc::clone(&clock))
-            .with_data_source(source.clone())
+            .with_data_source(src.clone())
             .build();
 
         let brkr = SimulatedBrokerBuilder::new()
             .with_exchange(exchange)
-            .with_data(source)
+            .with_data(src.clone())
             .build();
 
-        let strat = StaticInvestmentStrategy::new(
-            brkr,
-            Schedule::EveryFriday,
-            weights,
-            Rc::clone(&clock),
-        );
+        let strat =
+            StaticInvestmentStrategy::new(brkr, Schedule::EveryFriday, weights, Rc::clone(&clock));
         let config = Config::parse(&input.config.clone()).unwrap();
 
         let sim = config.create(Rc::clone(&clock), strat, src);
@@ -116,97 +162,164 @@ pub fn antevorta_multiple(input: AntevortaMultipleInput) -> Result<AntevortaResu
             state: sim,
         };
         let result = runner.run();
-        res.push(result.0);
+        if let Ok(mut x) = results.lock() {
+            x.push(result.0);
+        }
+        Ok(())
+    };
+
+    for _i in 0..input.runs {
+        let res_copy = res.clone();
+        let input_copy = input.clone();
+        let _test = run_func(input_copy, res_copy);
     }
-    Ok(AntevortaResults { values: res })
+    let values = res.lock().unwrap().to_vec();
+    Ok(AntevortaResults { values })
 }
 
 #[cfg(test)]
 mod tests {
 
+    use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
-    use rand::distributions::Uniform;
-    use rand::thread_rng;
-    use rand_distr::Distribution;
 
-    use super::{antevorta_multiple, AntevortaMultipleInput};
+    use crate::eod::EodRow;
 
-    fn setup() -> (
-        HashMap<String, Vec<f64>>,
-        Vec<i64>,
-        Vec<String>,
-        HashMap<String, f64>,
-    ) {
-        let price_dist = Uniform::new(80.0, 120.0);
-        let mut rng = thread_rng();
+    use super::{antevorta_multiple, AntevortaMultipleInput, EodRawAntevortaInput};
 
-        let assets = vec![0.to_string(), 1.to_string()];
-        let dates: Vec<i64> = (0..399).collect();
-        let mut close: HashMap<String, Vec<f64>> = HashMap::new();
-        for asset in &assets {
-            let mut close_data: Vec<f64> = Vec::new();
-            for _date in &dates {
-                close_data.push(price_dist.sample(&mut rng));
+    #[derive(Deserialize, Serialize)]
+    struct TestEodInput {
+        data: Vec<EodRow>,
+    }
+
+    fn setup() -> EodRawAntevortaInput {
+        let text = std::fs::read_to_string("./data/mcd.json").unwrap();
+        let json = serde_json::from_str::<TestEodInput>(&text).unwrap();
+        let to_vec = vec![json.data];
+        let config = r#"
+            {
+                "flows": [
+                    {
+                        "person":0,
+                        "schedule": {
+                            "schedule_type":"EndOfMonth"
+                        },
+                        "value":4000,
+                        "flow_type":"Employment"
+                    }
+                ],
+                "stacks": [
+                    {
+                        "stack_type":"Gia",
+                        "value":0
+                    },
+                    {
+                        "stack_type":"Isa",
+                        "value":0
+                    },
+                    {
+                        "stack_type":"Sipp",
+                        "value":0
+                    }
+                ],
+                "nic":"A",
+                "contribution_pct":0.05,
+                "emergency_cash_min":1000,
+                "starting_cash":5000,
+                "lifetime_pension_contributions":0
             }
-            close.insert(asset.clone(), close_data);
-        }
-        let mut weights: HashMap<String, f64> = HashMap::new();
-        weights.insert(String::from("0"), 0.5);
-        weights.insert(String::from("1"), 0.5);
+        "#;
 
-        (close, dates, assets, weights)
+        let mut weights = HashMap::new();
+        weights.insert("100".to_string(), 0.5);
+
+        EodRawAntevortaInput {
+            close: to_vec,
+            assets: vec!["100".to_string()],
+            config: config.to_string(),
+            runs: 2,
+            sim_length: 2,
+            weights,
+        }
     }
 
     #[test]
-    fn run_income_simulation_mult() {
-        //weights is {symbol: weight}
-        //data is {asset_id[i64]: {open/close[str]: {date[i64], price[f64]}}}
-        let res = setup();
-        let close = res.0;
-        let dates = res.1;
-        let assets = res.2;
-        let weights = res.3;
-        let data = r#"{
-            "starting_cash": 100000.0,
-            "nic": "A",
-            "contribution_pct": 0.1,
-            "emergency_cash_min": 4000.0,
-            "lifetime_pension_contributions": 0.0,
-            "flows": [
-                {
-                    "flow_type": "Employment",
-                    "value": 4000.0,
-                    "schedule": {
-                        "schedule_type": "EveryDay"
-                    }
-                }
-            ],
-            "stacks": [
-                {
-                    "stack_type": "Gia",
-                    "value": 1000.0
-                },
-                {
-                    "stack_type": "Sipp",
-                    "value": 1000.0
-                },
-                {
-                    "stack_type": "Isa",
-                    "value": 1000.0
-                }
-            ]
-        }"#;
+    pub fn test_antevorta_date_intersection() {
+        let abc = vec![
+            EodRow {
+                date: String::from("2021-10-01"),
+                open: 10.0,
+                high: 10.0,
+                low: 10.0,
+                close: 10.0,
+                adjusted_close: 10.0,
+                volume: 10.0,
+            },
+            EodRow {
+                date: String::from("2021-10-02"),
+                open: 10.0,
+                high: 10.0,
+                low: 10.0,
+                close: 10.0,
+                adjusted_close: 10.0,
+                volume: 10.0,
+            },
+            EodRow {
+                date: String::from("2021-10-03"),
+                open: 10.0,
+                high: 10.0,
+                low: 10.0,
+                close: 10.0,
+                adjusted_close: 10.0,
+                volume: 10.0,
+            },
+        ];
+        let bcd = vec![
+            EodRow {
+                date: String::from("2021-10-02"),
+                open: 10.0,
+                high: 10.0,
+                low: 10.0,
+                close: 10.0,
+                adjusted_close: 10.0,
+                volume: 10.0,
+            },
+            EodRow {
+                date: String::from("2021-10-03"),
+                open: 10.0,
+                high: 10.0,
+                low: 10.0,
+                close: 10.0,
+                adjusted_close: 10.0,
+                volume: 10.0,
+            },
+        ];
 
-        let input = AntevortaMultipleInput {
-            dates,
-            assets,
-            close,
-            weights,
-            sim_length: 5,
-            runs: 5,
-            config: String::from(data),
+        let input = EodRawAntevortaInput {
+            close: vec![abc, bcd],
+            assets: vec!["101".to_string(), "102".to_string()],
+            config: "".to_string(),
+            runs: 0,
+            sim_length: 0,
+            weights: HashMap::new(),
         };
-        let res = antevorta_multiple(input);
-        println!("{:?}", res);
+
+        let antevorta: AntevortaMultipleInput = input.into();
+        //Queries the length of the price series which should be the length of bcd
+        assert_eq!(antevorta.close.get("101").unwrap().len(), 2);
+        //Asserts that the length of the prices series are equal
+        assert_eq!(
+            antevorta.close.get("101").unwrap().len(),
+            antevorta.close.get("102").unwrap().len()
+        );
+        //Asserts date conversion
+        assert_eq!(antevorta.dates, vec![1633165200, 1633251600]);
+    }
+
+    #[test]
+    pub fn test_antevorta_load() {
+        let antevorta = setup();
+        //This is larger dataset, this tests that we load without errors
+        let _res = antevorta_multiple(antevorta.into()).unwrap();
     }
 }

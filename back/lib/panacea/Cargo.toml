@@ -8,12 +8,16 @@ name = "panacea"
 crate-type = ["cdylib"]
 
 [dependencies]
-alator = { "tag" = "v0.2.1", git = "https://github.com/calumrussell/alator.git" }
+alator = { "tag" = "v0.2.3", git = "https://github.com/calumrussell/alator.git" }
 antevorta = { path = "./antevorta" }
 rand = "0.8.4"
 getrandom = { version = "0.2.8", features = ["js"] }
 rand_distr = "0.4.1"
 wasm-bindgen = "0.2.83"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.91"
 serde-wasm-bindgen = "0.4"
+time = { version = "0.3.17", features = ["formatting", "macros", "parsing"] }
 web-sys = { version = "0.3.60", features = ["console"] }
+console_error_panic_hook = "0.1.7"
+smartcore = "0.3.0"

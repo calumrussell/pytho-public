@@ -6,9 +6,8 @@ import { errorSchema } from "./error";
 
 interface AntevortaInput {
   assets: Array<string>,
+  close: Array<Array<EodSource.Row>>,
   weights: Map<string, number>,
-  dates: Array<number>,
-  close: Map<string, Array<number>>,
   sim_length: number,
   runs: number,
   config: string,
@@ -42,26 +41,10 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
       throw Error("Missing issuer");
     }
     const assetTickers = assetIssuers.value.map((res: Issuer.Row) => res.ticker);
-    const assetData = await EodSource.getPrices(assetTickers);
+    const assetData = await EodSource.getPricesFlat(assetTickers);
     if (assetData._tag === "None" || assetData.value.length === 0) {
       throw Error("Missing data for issuer");
     }
-
-    const mergedData = assetData.value.mergeOnSource(assets);
-    const dates = assetData.value.getOverlappingDates();
-    if (dates._tag === "None") {
-      throw Error("No dates");
-    }
-
-    if (dates.value.length === 0) {
-      throw Error("No overlapping dates");
-    }
-
-    const closeData = new Map();
-    mergedData.forEach((value, key) => {
-      //Because we haven't merged, this will only return one series
-      closeData.set(key.toString(), [...value.getAdjustedClose().values()].flat());
-    });
 
     let mappedWeights = new Map();
     weights.forEach((weight, i) => {
@@ -71,15 +54,13 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
     const input: AntevortaInput = {
       assets: assets.map(a => a.toString()),
       weights: mappedWeights,
-      dates: dates.value,
-      close: closeData,
+      close: assetData.value,
       sim_length,
       runs,
       config: sim_config,
     };
 
     let res = { data: antevorta(input) };
-    console.log(res);
     return reply.send(res);
   } catch (e) {
     console.log(e);

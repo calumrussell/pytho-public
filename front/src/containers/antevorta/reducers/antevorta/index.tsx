@@ -4,6 +4,7 @@ import {
   request
 } from '@Common/index';
 import { FinancialPlan, PlanStack, StackType } from '@Components/reducers/fplan';
+import { AxiosError } from 'axios';
 
 export interface SimRequestInput {
   runs: number,
@@ -83,7 +84,7 @@ export const useAntevorta = () => {
     } = context;
  
     //Assumes that input is correct
-    const simRequest = (input: SimRequestInput, runs: number, errFunc: (err: string) => void, finallyFunc: () => void) => {
+    const simRequest = (input: SimRequestInput, runs: number, errFunc: (err: AxiosError) => void, finallyFunc: () => void) => {
       errorChecker(input)
         .then(() => {
           if (state.results != null) {

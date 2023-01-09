@@ -3,7 +3,7 @@ FROM rust:1.66
 WORKDIR /app
 COPY . ./
 RUN cd ./lib/panacea && ls
-RUN cd ./lib/panacea && cargo build && cargo install wasm-pack && wasm-pack build --target nodejs
+RUN cd ./lib/panacea && cargo build && cargo install wasm-pack && wasm-pack build --target nodejs --release
 
 FROM node:18
 

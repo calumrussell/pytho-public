@@ -35,7 +35,10 @@ fn isa_deposit_logic(
         //Deposit would take us over the threhold,
         //deposit as much as possible and return
         //the rest
-        (CashValue::from(can_deposit), CashValue::from(*amount - can_deposit))
+        (
+            CashValue::from(can_deposit),
+            CashValue::from(*amount - can_deposit),
+        )
     }
 }
 
@@ -112,6 +115,10 @@ pub struct Isa<S: InvestmentStrategy> {
 
 //Tax year state is controlled from within the simulation.
 impl<S: InvestmentStrategy> Isa<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn rebalance(&mut self) {
         if *self.strat.get_liquidation_value() > 0.0 {
             self.strat.update();
@@ -194,6 +201,10 @@ pub struct Gia<S: InvestmentStrategy> {
 }
 
 impl<S: InvestmentStrategy> Gia<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn get_capital_gains(&self, date: &i64, tax_year_start: &i64) -> CashValue {
         //To calculate capital gains we need the whole trade history for that symbol
         let all_trades: Vec<Trade> = self.strat.trades_between(&0, date);
@@ -291,9 +302,15 @@ fn sipp_deposit_logic(
         //Find the lowest threshold, deposit as much as possible
         //under that threshold
         if can_deposit_year > can_deposit_life {
-            (CashValue::from(can_deposit_life), CashValue::from(*amount - can_deposit_life))
+            (
+                CashValue::from(can_deposit_life),
+                CashValue::from(*amount - can_deposit_life),
+            )
         } else {
-            (CashValue::from(can_deposit_year), CashValue::from(*amount - can_deposit_year))
+            (
+                CashValue::from(can_deposit_year),
+                CashValue::from(*amount - can_deposit_year),
+            )
         }
     }
 }
@@ -307,6 +324,10 @@ pub struct Sipp<S: InvestmentStrategy> {
 }
 
 impl<S: InvestmentStrategy> Sipp<S> {
+    pub fn zero(&mut self) {
+        self.strat.zero();
+    }
+
     pub fn liquidation_value(&mut self) -> CashValue {
         self.strat.get_liquidation_value()
     }
@@ -341,11 +362,7 @@ impl<S: InvestmentStrategy> Sipp<S> {
         (deposit, returned)
     }
 
-    pub fn new_with_cash(
-        strat: S,
-        lifetime_contributions: &f64,
-        start_cash: &f64,
-    ) -> Self {
+    pub fn new_with_cash(strat: S, lifetime_contributions: &f64, start_cash: &f64) -> Self {
         let mut s = Self::new(strat, CashValue::from(*lifetime_contributions));
         s.strat.init(start_cash);
         s
@@ -383,6 +400,12 @@ impl<S: InvestmentStrategy> CanTransfer for Sipp<S> {
 #[derive(Clone, Debug)]
 pub struct BankAcc {
     pub balance: CashValue,
+}
+
+impl BankAcc {
+    pub fn zero(&mut self) {
+        self.withdraw(&self.balance.clone());
+    }
 }
 
 impl CanTransfer for BankAcc {
@@ -477,7 +500,6 @@ impl AmortizingLoanLogic {
         }
 
         let payment_due = self.payment_due(amortization_payment);
-        println!("{:?}", payment_due);
         if let TransferResult::Success = src.withdraw(&payment_due) {
             return LoanEvent::PaymentSuccess(payment_due);
         }
@@ -485,7 +507,7 @@ impl AmortizingLoanLogic {
     }
 
     pub fn new(balance: &f64, rate: f64, term_yrs: u8) -> Self {
-        let amortization_payment_min = calculate_amortization_payment(&balance, &term_yrs);
+        let amortization_payment_min = calculate_amortization_payment(balance, &term_yrs);
         Self {
             balance: CashValue::from(*balance),
             rate,
@@ -523,7 +545,7 @@ impl<T: SimDataSource> Mortgage<T> {
             .unix_timestamp()
             .into();
 
-        let loan = AmortizingLoanLogic::new(&balance, rate, initial_fix_in_yrs);
+        let loan = AmortizingLoanLogic::new(balance, rate, initial_fix_in_yrs);
         let payment_schedule = Schedule::EveryMonth(25);
         Self {
             loan,
@@ -550,7 +572,7 @@ impl<T: SimDataSource> Mortgage<T> {
                     let mortgage_margin = rate + 0.04;
                     let remaining = &self.loan.balance;
                     self.loan =
-                        AmortizingLoanLogic::new(&remaining, mortgage_margin, self.fix_period);
+                        AmortizingLoanLogic::new(remaining, mortgage_margin, self.fix_period);
 
                     let curr_offset_date: OffsetDateTime = curr_date.into();
                     let fix_duration = Duration::weeks(self.fix_period as i64 * 52);
@@ -604,155 +626,58 @@ mod tests {
     #[test]
     fn test_that_sipp_threshold() {
         //TODO: this should be tested with mocks
-        let res = sipp_deposit_logic(
-            &100.0,
-            &50.0,
-            &50.0,
-            &0.0,
-            &0.0,
-        );
+        let res = sipp_deposit_logic(&100.0, &50.0, &50.0, &0.0, &0.0);
         assert!(*res.0 == 50.0 && *res.1 == 50.0);
 
-        let res1 = sipp_deposit_logic(
-            &10.0,
-            &50.0,
-            &50.0,
-            &0.0,
-            &0.0,
-        );
+        let res1 = sipp_deposit_logic(&10.0, &50.0, &50.0, &0.0, &0.0);
         assert!(*res1.0 == 10.0 && *res1.1 == 0.0);
 
-        let res2 = sipp_deposit_logic(
-            &10.0,
-            &50.0,
-            &50.0,
-            &40.0,
-            &40.0,
-        );
+        let res2 = sipp_deposit_logic(&10.0, &50.0, &50.0, &40.0, &40.0);
         assert!(*res2.0 == 10.0 && *res2.1 == 0.0);
 
-        let res3 = sipp_deposit_logic(
-            &10.0,
-            &50.0,
-            &50.0,
-            &45.0,
-            &45.0,
-        );
+        let res3 = sipp_deposit_logic(&10.0, &50.0, &50.0, &45.0, &45.0);
         assert!(*res3.0 == 5.0 && *res3.1 == 5.0);
 
-        let res4 = sipp_deposit_logic(
-            &10.0,
-            &50.0,
-            &100.0,
-            &45.0,
-            &45.0,
-        );
+        let res4 = sipp_deposit_logic(&10.0, &50.0, &100.0, &45.0, &45.0);
         assert!(*res4.0 == 5.0 && *res4.1 == 5.0);
 
-        let res5 = sipp_deposit_logic(
-            &10.0,
-            &100.0,
-            &50.0,
-            &45.0,
-            &45.0,
-        );
+        let res5 = sipp_deposit_logic(&10.0, &100.0, &50.0, &45.0, &45.0);
         assert!(*res5.0 == 5.0 && *res5.1 == 5.0);
     }
 
     #[test]
     fn test_capital_gains_calculation_logic() {
+        let t1 = Trade::new("ABC", 1000.0, 100.0, 1, TradeType::Buy);
 
-        let t1 = Trade::new(
-            "ABC",
-            1000.0,
-            100.0,
-            1,
-            TradeType::Buy,
-        );
-         
-        let t2 = Trade::new(
-            "ABC",
-            1100.0,
-            100.0,
-            10,
-            TradeType::Sell
-        );
+        let t2 = Trade::new("ABC", 1100.0, 100.0, 10, TradeType::Sell);
 
         let trades = vec![t1, t2];
         let capital_gains = calculate_capital_gains(&trades, &0);
         assert!(*capital_gains == 100.0);
 
-        let t1 = Trade::new(
-            "ABC",
-            1000.0,
-            100.0,
-            1,
-            TradeType::Buy
-        );
+        let t1 = Trade::new("ABC", 1000.0, 100.0, 1, TradeType::Buy);
 
-        let t2 = Trade::new(
-            "ABC",
-            1100.0,
-            100.0,
-            10,
-            TradeType::Sell
-        );
+        let t2 = Trade::new("ABC", 1100.0, 100.0, 10, TradeType::Sell);
 
         let trades = vec![t1, t2];
         let capital_gains = calculate_capital_gains(&trades, &5.into());
         assert!(*capital_gains == 100.0);
 
-        let t1 = Trade::new(
-            "ABC",
-            1000.0,
-            100.0,
-            1,
-            TradeType::Buy,
-        );
+        let t1 = Trade::new("ABC", 1000.0, 100.0, 1, TradeType::Buy);
 
-        let t2 = Trade::new(
-            "ABC",
-            825.0,
-            75.0,
-            10,
-            TradeType::Sell,
-        );
+        let t2 = Trade::new("ABC", 825.0, 75.0, 10, TradeType::Sell);
 
-        let t3 = Trade::new(
-            "ABC",
-            275.0,
-            25.0,
-            10,
-            TradeType::Sell,
-        );
+        let t3 = Trade::new("ABC", 275.0, 25.0, 10, TradeType::Sell);
 
         let trades = vec![t1, t2, t3];
         let capital_gains = calculate_capital_gains(&trades, &0.into());
         assert!(*capital_gains == 100.0);
 
-        let t1 = Trade::new(
-            "ABC",
-            1000.0,
-            100.0,
-            1,
-            TradeType::Buy,
-        );
+        let t1 = Trade::new("ABC", 1000.0, 100.0, 1, TradeType::Buy);
 
-        let t2 = Trade::new(
-            "ABC",
-            1000.0,
-            50.0,
-            10,
-            TradeType::Buy,
-        );
+        let t2 = Trade::new("ABC", 1000.0, 50.0, 10, TradeType::Buy);
 
-        let t3 = Trade::new(
-            "ABC",
-            10.0,
-            150.0,
-            15,
-            TradeType::Sell,
-        );
+        let t3 = Trade::new("ABC", 10.0, 150.0, 15, TradeType::Sell);
 
         let trades = vec![t1, t2, t3];
         let capital_gains = calculate_capital_gains(&trades, &0.into());
@@ -776,14 +701,7 @@ mod tests {
             .build();
 
         let rate = 0.05;
-        let mut mortgage = Mortgage::start(
-            &100_000.0,
-            rate,
-            &1,
-            1,
-            Rc::clone(&clock),
-            source,
-        );
+        let mut mortgage = Mortgage::start(&100_000.0, rate, &1, 1, Rc::clone(&clock), source);
         let mut test_acc = BankAcc {
             balance: 10_000.0.into(),
         };
@@ -814,14 +732,7 @@ mod tests {
             .build();
 
         let rate = 0.05;
-        let mut mortgage = Mortgage::start(
-            &1_000_000.0,
-            rate,
-            &1,
-            1,
-            Rc::clone(&clock),
-            source,
-        );
+        let mut mortgage = Mortgage::start(&1_000_000.0, rate, &1, 1, Rc::clone(&clock), source);
         let mut test_acc = BankAcc {
             balance: 1_000.0.into(),
         };

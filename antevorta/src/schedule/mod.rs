@@ -18,7 +18,7 @@ pub enum Schedule {
 
 impl Schedule {
     pub fn last_period(&self, date: &i64) -> Option<DateTime> {
-        let epoch: i64 = i64::from(*date);
+        let epoch: i64 = *date;
         let real_date = OffsetDateTime::from_unix_timestamp(epoch);
         match real_date {
             Ok(d) => match self {
