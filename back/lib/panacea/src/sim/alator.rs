@@ -79,19 +79,23 @@ pub struct AlatorResults {
     pub mdd: f64,
     pub sharpe: f64,
     pub values: Vec<f64>,
-    pub returns: Vec<f64>,
     pub dates: Vec<i64>,
 }
 
 fn convert_result(res: BacktestOutput) -> AlatorResults {
+    let rounded_values: Vec<f64> = res
+        .values
+        .iter()
+        .map(|x: &f64| (x * 100.0).round() / 100.0)
+        .collect();
+
     AlatorResults {
         ret: res.ret,
         cagr: res.cagr,
         vol: res.vol,
         mdd: res.mdd,
         sharpe: res.sharpe,
-        values: res.values,
-        returns: res.returns,
+        values: rounded_values,
         dates: res.dates,
     }
 }
@@ -129,7 +133,7 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
         weights.insert(symbol.clone(), *input.weights.get(&symbol.clone()).unwrap());
     }
 
-    let initial_cash = 100_000.0;
+    let initial_cash = 100.0;
 
     let exchange = DefaultExchangeBuilder::new()
         .with_data_source(source.clone())
