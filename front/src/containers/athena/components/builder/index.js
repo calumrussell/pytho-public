@@ -30,7 +30,7 @@ export const Builder = (props) => {
   } = useModel();
 
   const {
-    searchState,
+    state: searchState,
     clearInput,
     clearOptions,
   } = useSuggest();
