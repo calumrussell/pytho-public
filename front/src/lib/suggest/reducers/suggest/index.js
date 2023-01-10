@@ -1,5 +1,4 @@
 import React from 'react';
-import axios from 'axios';
 
 import { request } from '@Common';
 
@@ -9,6 +8,7 @@ const initialStateSearch = {
   input: '',
   options: [
   ],
+  requestController: undefined,
 };
 
 const actionTypesSearch = {
@@ -17,6 +17,8 @@ const actionTypesSearch = {
   clearOptions: 'CLEAR_OPT',
   updateInput: 'UPDATE_IN',
   updateOptions: 'UPDATE_OPT',
+  clearRequest: 'CLEAR_REQUEST',
+  startRequest: 'START_REQUEST',
 };
 
 const searchReducer = (state, action) => {
@@ -68,34 +70,18 @@ const searchReducer = (state, action) => {
       };
     }
 
-    default:
-      new Error('Unknown action type');
-  }
-};
-
-const initialStateRequest = {
-  controller: undefined,
-};
-
-const actionTypesRequest = {
-  requestStart: 'SRT',
-  requestClear: 'CLR',
-};
-
-const requestReducer = (state, action) => {
-  switch (action.type) {
-    case actionTypesRequest.requestStart: {
+    case actionTypesSearch.clearRequest: {
       return {
         ...state,
-        requestController: action.controller,
-      };
+        controller: undefined,
+      }
     }
 
-    case actionTypesRequest.requestClear: {
+    case actionTypesSearch.startRequest: {
       return {
         ...state,
-        requestController: undefined,
-      };
+        controller: action.controller,
+      }
     }
 
     default:
@@ -109,37 +95,28 @@ export const useSuggest = () => {
   const context = React.useContext(SuggestContext);
 
   const {
-    searchState, searchDispatch, requestState, requestDispatch,
+    state, dispatch,
   } = context;
 
   const updateInput = (input) => {
-    if (requestState.controller) {
-      // If request is running when user inputs new value
-      // we cancel running request
-      requestState.controller.abort();
-      requestDispatch({
-        type: 'CLR',
-      });
-    }
-
-    searchDispatch({
+    dispatch({
       type: 'UPDATE_IN',
       input: input,
     });
   };
 
   const clearOptions = () =>
-    searchDispatch({
+    dispatch({
       type: 'CLEAR_OPT',
     });
 
   const clearInput = () =>
-    searchDispatch({
+    dispatch({
       type: 'CLEAR_IN',
     });
 
   const updateOptions = (coverage, value) =>
-    searchDispatch({
+    dispatch({
       type: 'UPDATE_OPT',
       options: coverage,
       input: value,
@@ -148,27 +125,38 @@ export const useSuggest = () => {
   const getOptions = ({
     value, reason, url,
   }) => {
-    const controller = new AbortController();
+    //If request is already in progress, then we cancel it
+    if (state.controller) {
+      // If request is running when user inputs new value
+      // we cancel running request
+      state.controller.abort();
+      dispatch({
+        type: 'CLEAR_REQUEST',
+      });
+    }
 
-    requestDispatch({
-      type: 'SRT',
+    const controller = new AbortController();
+    dispatch({
+      type: 'START_REQUEST',
       controller,
     });
 
     request(url)
       .get(controller)
       .then((res) => res.data)
-      .then((res) => updateOptions(res.data, value));
+      .then((res) => updateOptions(res.data, value))
+      //We don't do anything here because this request can be aborted
+      .catch((_err) => null);
   };
 
   const selectValue = (value) =>
-    searchDispatch({
+    dispatch({
       type: 'SELECT',
       value,
     });
 
   return {
-    searchState,
+    state,
     updateInput,
     clearInput,
     clearOptions,
@@ -179,21 +167,15 @@ export const useSuggest = () => {
 
 export const SuggestProvider = (props) => {
   const [
-    searchState,
-    searchDispatch,
+    state,
+    dispatch,
   ] = React.useReducer(searchReducer, initialStateSearch);
-  const [
-    requestState,
-    requestDispatch,
-  ] = React.useReducer(requestReducer, initialStateRequest);
 
   return <SuggestContext.Provider
     value={
       {
-        searchState,
-        searchDispatch,
-        requestState,
-        requestDispatch,
+        state,
+        dispatch,
       }
     }
     { ...props } />;

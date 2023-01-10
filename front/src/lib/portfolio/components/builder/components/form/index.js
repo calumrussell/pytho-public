@@ -34,17 +34,17 @@ export const BuilderForm = ({
   } = usePortfolio();
 
   const {
-    searchState,
+    state,
     clearInput,
     clearOptions,
   } = useSuggest();
 
-  const isFinished = weight != '' && searchState.hasSelected;
+  const isFinished = weight != '' && state.hasSelected;
 
   const addSecurity = (e) => {
     e.preventDefault();
-    addToPortfolio(searchState.value, weight);
-    clearInput();
+    addToPortfolio(state.value, weight);
+    clearInput()
     clearOptions();
   };
 

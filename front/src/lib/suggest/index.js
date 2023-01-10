@@ -16,7 +16,7 @@ export const AutoSuggest = ({
   id, selectFunc, renderFunc, searchFunc, getValueFunc, shouldRenderSuggestions,
 }) => {
   const {
-    searchState,
+    state,
     clearOptions,
     updateInput,
     selectValue,
@@ -39,7 +39,7 @@ export const AutoSuggest = ({
   return (
     <Autosuggest
       id={ id }
-      suggestions={ searchState.options }
+      suggestions={ state.options }
       shouldRenderSuggestions={ (v) => shouldRenderSuggestions(v) }
       onSuggestionsClearRequested={ () => clearOptions() }
       onSuggestionSelected={ selectSuggestion }
@@ -50,7 +50,7 @@ export const AutoSuggest = ({
         {
           id: id + '-selection',
           placeholder: 'Search Security',
-          value: searchState.input,
+          value: state.input,
           onChange: onInputChange,
         }
       }
