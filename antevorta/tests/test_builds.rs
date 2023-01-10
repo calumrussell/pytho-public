@@ -247,7 +247,9 @@ fn test_that_stack_creation_without_value_fails() {
 }
 
 #[test]
-fn test_build_that_is_failing() {
+fn test_build_that_orders_income_expense_before_income() {
+    //This was triggering an error where the expense was deducted before the income when going
+    //through the loop. Which caused issues with calculations downstream.
     let data = r#"
         {
             "flows": [

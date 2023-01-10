@@ -284,13 +284,29 @@ impl Config {
             panic!("Missing investment account");
         }
 
-        let flows: Vec<Flow> = self
+        //Have to make sure that expenses are ordered after income
+        let mut non_expense_flows: Vec<Flow> = self
             .flows
             .as_ref()
             .unwrap()
             .iter()
             .map(|f| f.build(&src))
+            .filter(|f| f.is_expense())
             .collect();
+
+        let mut expense_flows: Vec<Flow> = self
+            .flows
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|f| f.build(&src))
+            .filter(|f| !f.is_expense())
+            .collect();
+
+        let mut flows = Vec::new();
+        flows.append(&mut expense_flows);
+        flows.append(&mut non_expense_flows);
+
         let annual_tax_schedule = Schedule::EveryYear(1, 4);
 
         let constants = SimConstants {

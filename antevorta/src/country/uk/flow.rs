@@ -16,8 +16,8 @@ trait WillFlow<S: InvestmentStrategy> {
     fn set_value(&mut self, cash: &f64);
 }
 
-#[derive(Clone)]
-pub enum Flow{
+#[derive(Clone, Debug)]
+pub enum Flow {
     Employment(Employment),
     EmploymentStaticGrowth(StaticGrowth, Employment),
     EmploymentFixedGrowth(FixedGrowth, Employment),
@@ -31,6 +31,13 @@ pub enum Flow{
 }
 
 impl Flow {
+    pub fn is_expense(&self) -> bool {
+        match self {
+            Flow::Expense(_) | Flow::InflationLinkedExpense(_,_) | Flow::PctOfIncomeExpense(_) => true,
+            _ => false
+        }
+    }
+
     pub fn check<S: InvestmentStrategy>(
         &mut self,
         curr: &DateTime,
@@ -51,7 +58,7 @@ impl Flow {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InflationDataHashMap {
     source: HashMapSourceSim,
 }
@@ -80,7 +87,7 @@ impl InflationDataHashMap {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StaticGrowth {
     growth_rate: f64,
 }
@@ -105,7 +112,7 @@ impl StaticGrowth {
 
 type FixedGrowthData = HashMap<DateTime, f64>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FixedGrowth {
     growth_data: FixedGrowthData,
 }
@@ -132,7 +139,7 @@ impl FixedGrowth {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Employment {
     value: CashValue,
     schedule: Schedule,
@@ -189,7 +196,7 @@ impl From<Employment> for UKTaxableIncome {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmploymentPAYE {
     value: CashValue,
     schedule: Schedule,
@@ -251,7 +258,7 @@ impl From<EmploymentPAYE> for UKTaxableIncome {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Rental {
     value: CashValue,
     schedule: Schedule,
@@ -292,7 +299,7 @@ impl From<Rental> for UKTaxableIncome {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Expense {
     value: CashValue,
     schedule: Schedule,
@@ -334,7 +341,7 @@ impl Expense {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PctOfIncomeExpense {
     pct: f64,
     schedule: Schedule,
@@ -343,7 +350,10 @@ pub struct PctOfIncomeExpense {
 impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            if *state.2.income_paid < 0.0 {
+            //This is correct, tried to fiddle with this and we need to make sure that income runs
+            //before expense. If this isn't true then the simulation cannot continue/we generate
+            //lots of erroneous transactions.
+            if *state.2.income_paid <= 0.0 {
                 //Panic here because if this hits then the caller likely made an error in the
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");
