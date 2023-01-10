@@ -343,7 +343,7 @@ pub struct PctOfIncomeExpense {
 impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            if *state.2.income_paid <= 0.0 {
+            if *state.2.income_paid < 0.0 {
                 //Panic here because if this hits then the caller likely made an error in the
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");

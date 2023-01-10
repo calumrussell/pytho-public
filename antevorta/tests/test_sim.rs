@@ -73,6 +73,7 @@ fn sim_test() {
     let sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
+
     let mut runner = SimRunner {
         clock: Rc::clone(&clock),
         state: sim,

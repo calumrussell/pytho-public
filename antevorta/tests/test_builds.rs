@@ -8,6 +8,7 @@ a complete config.
 use alator::exchange::DefaultExchangeBuilder;
 use antevorta::country::uk::Config;
 use antevorta::input::{FakeHashMapSourceSimWithQuotes, HashMapSourceSim};
+use antevorta::sim::SimRunner;
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use std::collections::HashMap;
@@ -36,8 +37,8 @@ fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
         let q_abc = Quote::new(price_abc, price_abc, date.clone(), "ABC");
         let q_bcd = Quote::new(price_bcd, price_bcd, date.clone(), "BCD");
         fake_data.insert(date.into(), vec![q_abc, q_bcd]);
-        price_abc += price_abc * (1.0 + ret_dist.sample(&mut rng));
-        price_bcd += price_bcd * (1.0 + ret_dist.sample(&mut rng));
+        price_abc *= 1.0 + ret_dist.sample(&mut rng);
+        price_bcd *= 1.0 + ret_dist.sample(&mut rng);
     }
 
     let sim_data = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), fake_data);
@@ -84,8 +85,17 @@ fn test_that_build_fails_without_all_stacks() {
         }"#;
 
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data).unwrap();
-    config.create(Rc::clone(&clock), strat, sim_data);
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
 }
 
 #[test]
@@ -129,8 +139,17 @@ fn test_that_percent_of_income_expense_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data).unwrap();
-    config.create(Rc::clone(&clock), strat, sim_data);
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
 }
 
 #[test]
@@ -168,8 +187,17 @@ fn test_that_static_growth_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data).unwrap();
-    config.create(Rc::clone(&clock), strat, sim_data);
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
 }
 
 #[test]
@@ -205,8 +233,73 @@ fn test_that_stack_creation_without_value_fails() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data).unwrap();
-    config.create(Rc::clone(&clock), strat, sim_data);
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
+}
+
+#[test]
+fn test_build_that_is_failing() {
+    let data = r#"
+        {
+            "flows": [
+                {
+                    "person":0,
+                    "schedule": {
+                        "schedule_type":"EndOfMonth"
+                    },
+                    "pct":0.5,
+                    "flow_type":"PctOfIncomeExpense"
+                },
+                {
+                    "person":0,
+                    "schedule": {
+                        "schedule_type":"EndOfMonth"
+                    },
+                    "value":4500,
+                    "flow_type":"Employment"
+                }
+            ],
+            "stacks": [
+                {
+                    "stack_type":"Gia",
+                    "value":0
+                },
+                {
+                    "stack_type":"Isa"
+                    ,"value":0
+                },{
+                    "stack_type":"Sipp"
+                    ,"value":0
+                }
+            ],
+            "nic":"A",
+            "contribution_pct":0.05,
+            "emergency_cash_min":1000,
+            "starting_cash":5000,
+            "lifetime_pension_contributions":0
+        }
+    "#;
+    let (clock, strat, sim_data) = setup();
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
 }
 
 #[test]
@@ -252,6 +345,15 @@ fn test_that_mortgage_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data).unwrap();
-    config.create(Rc::clone(&clock), strat, sim_data);
+    let config = Config::parse(data)
+        .unwrap()
+        .create(Rc::clone(&clock), strat, sim_data);
+
+    let mut runner = SimRunner {
+        clock: Rc::clone(&clock),
+        state: config,
+    };
+
+    let result = runner.run();
+    assert!(result.0 > 0.0);
 }
