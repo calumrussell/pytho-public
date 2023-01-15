@@ -77,20 +77,6 @@ impl SimLoopState {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct UKSimulationResult {
-    pub cash: CashValue,
-    pub isa: CashValue,
-    pub gia: CashValue,
-    pub sipp: CashValue,
-}
-
-impl UKSimulationResult {
-    pub fn get_total_value(&self) -> CashValue {
-        CashValue::from(*self.cash + *self.isa + *self.gia + *self.sipp)
-    }
-}
-
 //Each loop we check for rebalance, check tax, and then check for user-defined income events.
 pub struct UKSimulationState<S: InvestmentStrategy>(
     pub SimConstants,
@@ -139,7 +125,12 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     }
 
     pub fn get_state(&mut self) -> CashValue {
-        self.get_perf().get_total_value()
+        CashValue::from(
+            *self.1.isa.liquidation_value()
+            + *self.1.gia.liquidation_value()
+            + *self.1.sipp.liquidation_value()
+            + *self.1.bank.balance
+        )
     }
 
     fn rebalance_cash(&mut self) {
@@ -219,17 +210,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.0.annual_tax_schedule.clone(),
                 self.0.nic_group.clone(),
             );
-        }
-    }
-}
-
-impl<S: InvestmentStrategy> UKSimulationState<S> {
-    pub fn get_perf(&mut self) -> UKSimulationResult {
-        UKSimulationResult {
-            cash: self.1.bank.balance.clone(),
-            isa: self.1.isa.liquidation_value(),
-            gia: self.1.gia.liquidation_value(),
-            sipp: self.1.sipp.liquidation_value(),
         }
     }
 }

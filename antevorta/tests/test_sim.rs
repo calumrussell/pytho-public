@@ -78,5 +78,5 @@ fn sim_test() {
         sim.update();
     }
 
-    sim.get_perf().get_total_value();
+    sim.get_state();
 }
