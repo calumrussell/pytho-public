@@ -34,6 +34,15 @@ pub enum SimState {
     Unrecoverable,
 }
 
+pub struct SimAnnualReport {
+    pub isa: CashValue,
+    pub sipp: CashValue,
+    pub gia: CashValue,
+    pub cash: CashValue,
+    pub net_income: CashValue,
+    pub tax_paid: CashValue,
+}
+
 pub struct SimConstants {
     //Has to be ordered, tax has to be calculated first
     pub nic_group: NIC,
@@ -59,11 +68,16 @@ pub struct SimMutableState<S: InvestmentStrategy> {
 
 pub struct SimLoopState {
     pub income_paid: CashValue,
+    pub tax_paid: CashValue,
 }
 
 impl SimLoopState {
     pub fn clear(&mut self) {
         self.income_paid = CashValue::from(0.0);
+    }
+
+    pub fn paid_tax(&mut self, tax_paid: &f64) {
+        self.tax_paid = CashValue::from(*self.tax_paid + *tax_paid);
     }
 
     pub fn paid_income(&mut self, income: &f64) {
@@ -73,6 +87,7 @@ impl SimLoopState {
     pub fn init() -> Self {
         Self {
             income_paid: 0.0.into(),
+            tax_paid: 0.0.into(),
         }
     }
 }
@@ -131,6 +146,20 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             + *self.1.sipp.liquidation_value()
             + *self.1.bank.balance
         )
+    }
+
+    pub fn get_yearly_state(&mut self, curr_date: &DateTime) -> Option<SimAnnualReport> {
+        if self.1.annual_tax.check_bool(curr_date) {
+            return Some(SimAnnualReport {
+                isa: self.1.isa.liquidation_value(),
+                gia: self.1.gia.liquidation_value(),
+                sipp: self.1.sipp.liquidation_value(),
+                cash: self.1.bank.balance.clone(),
+                net_income: self.2.income_paid.clone(),
+                tax_paid: self.2.tax_paid.clone(),
+            });
+        }
+        None
     }
 
     fn rebalance_cash(&mut self) {
@@ -199,12 +228,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.1.bank.zero();
                 } else if *self.1.isa.liquidation_value() > *tax_due {
                     self.1.isa.liquidate(&tax_due);
+                    self.2.paid_tax(&tax_due);
                 } else {
                     let isa_value = self.1.isa.liquidation_value();
                     self.1.isa.liquidate(&isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.1.gia.liquidate(&remainder);
+
+                    self.2.paid_tax(&isa_value);
+                    self.2.paid_tax(&remainder);
                 }
+            } else {
+                self.2.paid_tax(&tax_due);
             }
             self.1.annual_tax = TaxPeriod::with_schedule(
                 self.0.annual_tax_schedule.clone(),
