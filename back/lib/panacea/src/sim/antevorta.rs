@@ -8,7 +8,6 @@ use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::country::uk::Config;
 use antevorta::input::FakeHashMapSourceSimWithQuotes;
 use antevorta::schedule::Schedule;
-use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -100,13 +99,10 @@ pub struct AntevortaResults {
 pub fn antevorta_multiple(
     input: AntevortaMultipleInput,
 ) -> Result<AntevortaResults, Box<dyn Error>> {
-    //Date inputs is misleading, we only use the start_date to resample from
-    type SimResults = Arc<Mutex<Vec<f64>>>;
-    let res: SimResults = Arc::new(Mutex::new(Vec::new()));
 
-    let run_func = |input: AntevortaMultipleInput,
-                    results: SimResults|
-     -> Result<_, Box<dyn Error + Send + Sync>> {
+    let mut result = Vec::new();
+
+    for _i in 0..input.runs {
         let start_date = input.dates.first().unwrap().clone();
         let sim_length = (input.sim_length * 365) as i64;
 
@@ -156,25 +152,16 @@ pub fn antevorta_multiple(
             StaticInvestmentStrategy::new(brkr, Schedule::EveryFriday, weights, Rc::clone(&clock));
         let config = Config::parse(&input.config.clone()).unwrap();
 
-        let sim = config.create(Rc::clone(&clock), strat, src);
-        let mut runner = SimRunner {
-            clock: Rc::clone(&clock),
-            state: sim,
-        };
-        let result = runner.run();
-        if let Ok(mut x) = results.lock() {
-            x.push(result.0);
-        }
-        Ok(())
-    };
+        let mut sim = config.create(Rc::clone(&clock), strat, src);
 
-    for _i in 0..input.runs {
-        let res_copy = res.clone();
-        let input_copy = input.clone();
-        let _test = run_func(input_copy, res_copy);
+        while clock.borrow().has_next() {
+            clock.borrow_mut().tick();
+            sim.update();
+        }
+
+        result.push(*sim.get_state())
     }
-    let values = res.lock().unwrap().to_vec();
-    Ok(AntevortaResults { values })
+    Ok(AntevortaResults { values: result })
 }
 
 #[cfg(test)]
