@@ -7,7 +7,6 @@ use std::rc::Rc;
 
 use antevorta::country::uk::Config;
 use antevorta::schedule::Schedule;
-use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 
 //Tests simulations longer than one year. This verifies functioning of lower-frequency mutations to
@@ -67,15 +66,13 @@ fn sim_result_test() {
         ]
     }"#;
 
-    let sim = Config::parse(config)
+    let mut sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: sim,
-    };
-    let perf = runner.run();
-    println!("{:?}", perf);
-    assert!(perf.0 > 40_000.0);
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
+    assert!(*sim.get_state() > 40_000.0);
 }

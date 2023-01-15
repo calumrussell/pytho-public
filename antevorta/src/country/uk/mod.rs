@@ -19,7 +19,6 @@ use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
 use crate::schedule::Schedule;
-use crate::sim::{SimulationState, SimulationValue};
 use crate::strat::InvestmentStrategy;
 
 use flow::Flow;
@@ -100,6 +99,49 @@ pub struct UKSimulationState<S: InvestmentStrategy>(
 );
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
+    pub fn update(&mut self) {
+        match self.1.sim_state {
+            SimState::Ready => {
+                self.2.clear();
+                self.1.isa.check();
+                self.1.gia.check();
+                self.1.sipp.check();
+
+                let curr_date = self.0.clock.borrow().now();
+
+                self.rebalance_cash();
+                //Only triggers when schedule is met
+                self.pay_taxes(&curr_date);
+        
+                self.1.isa.rebalance();
+                self.1.gia.rebalance();
+                self.1.sipp.rebalance();
+
+                //We cannot pass the reference to self to flows whilst iterating over flows which are also
+                //on self, we therefore need to clone
+                let mut cloned_flows: Vec<Flow> = self.1.flows.to_vec();
+                for flow in cloned_flows.iter_mut() {
+                    flow.check(&curr_date, self);
+                }
+                //The internal state of the flows may have changed here, so we need to overwite flows on
+                //self
+                self.1.flows = cloned_flows;
+
+                self.rebalance_cash();
+
+                self.1.isa.finish();
+                self.1.gia.finish();
+                self.1.sipp.finish();
+            }
+            //If unrecoverable then no further updates
+            SimState::Unrecoverable => {}
+        }
+    }
+
+    pub fn get_state(&mut self) -> CashValue {
+        self.get_perf().get_total_value()
+    }
+
     fn rebalance_cash(&mut self) {
         let bank_bal = *self.1.bank.balance;
         let excess_cash = bank_bal - self.0.emergency_fund_minimum;
@@ -189,50 +231,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             gia: self.1.gia.liquidation_value(),
             sipp: self.1.sipp.liquidation_value(),
         }
-    }
-}
-
-impl<S: InvestmentStrategy> SimulationState for UKSimulationState<S> {
-    fn update(&mut self) {
-        match self.1.sim_state {
-            SimState::Ready => {
-                self.2.clear();
-                self.1.isa.check();
-                self.1.gia.check();
-                self.1.sipp.check();
-
-                let curr_date = self.0.clock.borrow().now();
-
-                self.rebalance_cash();
-                self.pay_taxes(&curr_date);
-        
-                self.1.isa.rebalance();
-                self.1.gia.rebalance();
-                self.1.sipp.rebalance();
-
-                //We cannot pass the reference to self to flows whilst iterating over flows which are also
-                //on self, we therefore need to clone
-                let mut cloned_flows: Vec<Flow> = self.1.flows.to_vec();
-                for flow in cloned_flows.iter_mut() {
-                    flow.check(&curr_date, self);
-                }
-                //The internal state of the flows may have changed here, so we need to overwite flows on
-                //self
-                self.1.flows = cloned_flows;
-
-                self.rebalance_cash();
-
-                self.1.isa.finish();
-                self.1.gia.finish();
-                self.1.sipp.finish();
-            }
-            //If unrecoverable then no further updates
-            SimState::Unrecoverable => {}
-        }
-    }
-
-    fn get_state(&mut self) -> SimulationValue {
-        SimulationValue(self.get_perf().get_total_value().into())
     }
 }
 

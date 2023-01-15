@@ -8,7 +8,6 @@ a complete config.
 use alator::exchange::DefaultExchangeBuilder;
 use antevorta::country::uk::Config;
 use antevorta::input::{FakeHashMapSourceSimWithQuotes, HashMapSourceSim};
-use antevorta::sim::SimRunner;
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use std::collections::HashMap;
@@ -85,17 +84,16 @@ fn test_that_build_fails_without_all_stacks() {
         }"#;
 
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
 
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    assert!(*sim.get_state() > 0.0);
 }
 
 #[test]
@@ -139,17 +137,16 @@ fn test_that_percent_of_income_expense_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
 
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    assert!(*sim.get_state() > 0.0);
 }
 
 #[test]
@@ -187,17 +184,15 @@ fn test_that_static_growth_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
-
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
+    assert!(*sim.get_state() > 0.0)
 }
 
 #[test]
@@ -233,17 +228,14 @@ fn test_that_stack_creation_without_value_fails() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
-
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
-
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
+    assert!(*sim.get_state() > 0.0)
 }
 
 #[test]
@@ -291,17 +283,16 @@ fn test_build_that_orders_income_expense_before_income() {
         }
     "#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
 
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    assert!(*sim.get_state() > 0.0)
 }
 
 #[test]
@@ -347,15 +338,14 @@ fn test_that_mortgage_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let config = Config::parse(data)
+    let mut sim = Config::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: config,
-    };
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
 
-    let result = runner.run();
-    assert!(result.0 > 0.0);
+    assert!(*sim.get_state() > 0.0)
 }

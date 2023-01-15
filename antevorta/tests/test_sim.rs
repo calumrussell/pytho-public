@@ -7,7 +7,6 @@ use std::rc::Rc;
 
 use antevorta::country::uk::Config;
 use antevorta::schedule::Schedule;
-use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 
 #[test]
@@ -70,15 +69,14 @@ fn sim_test() {
         ]
     }"#;
 
-    let sim = Config::parse(config)
+    let mut sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
 
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: sim,
-    };
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
 
-    let result = runner.run();
-    result.0;
+    sim.get_perf().get_total_value();
 }
