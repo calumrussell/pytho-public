@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
-use crate::input::{SimDataSource, HashMapSourceSim};
+use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::report::FlowReporter;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
@@ -34,8 +34,10 @@ pub enum Flow {
 impl Flow {
     pub fn is_expense(&self) -> bool {
         match self {
-            Flow::Expense(_) | Flow::InflationLinkedExpense(_,_) | Flow::PctOfIncomeExpense(_) => true,
-            _ => false
+            Flow::Expense(_) | Flow::InflationLinkedExpense(_, _) | Flow::PctOfIncomeExpense(_) => {
+                true
+            }
+            _ => false,
         }
     }
 

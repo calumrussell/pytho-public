@@ -47,13 +47,20 @@ impl DefaultUKReporter {
         }
     }
 
-    pub fn check<S: InvestmentStrategy>(&self, isa: &f64, gia: &f64, sipp: &f64, cash: &f64, curr_date: &i64) -> Option<UKAnnualReport> {
+    pub fn check<S: InvestmentStrategy>(
+        &self,
+        isa: &f64,
+        gia: &f64,
+        sipp: &f64,
+        cash: &f64,
+        curr_date: &i64,
+    ) -> Option<UKAnnualReport> {
         if self.schedule.check(curr_date) {
             let report = UKAnnualReport {
-                isa: isa.clone().into(),
-                gia: gia.clone().into(),
-                sipp: sipp.clone().into(),
-                cash: cash.clone().into(),
+                isa: (*isa).into(),
+                gia: (*gia).into(),
+                sipp: (*sipp).into(),
+                cash: (*cash).into(),
                 gross_income: self.gross_income_sum.clone(),
                 net_income: self.net_income_sum.clone(),
                 expense: self.expense_sum.clone(),
@@ -70,7 +77,7 @@ impl FlowReporter for DefaultUKReporter {
     fn paid_tax(&mut self, tax: &f64) {
         self.tax_paid_sum = CashValue::from(*self.tax_paid_sum + tax);
     }
-    
+
     fn paid_expense(&mut self, expense: &f64) {
         self.expense_sum = CashValue::from(*self.expense_sum + expense);
     }

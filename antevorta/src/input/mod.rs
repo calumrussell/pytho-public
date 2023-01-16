@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::{collections::HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use alator::{
@@ -31,7 +31,7 @@ pub struct HashMapSourceSimInner {
 
 #[derive(Clone, Debug)]
 pub struct HashMapSourceSim {
-    inner: Rc<RefCell<HashMapSourceSimInner>>
+    inner: Rc<RefCell<HashMapSourceSimInner>>,
 }
 
 impl SimDataSource for HashMapSourceSim {
@@ -95,7 +95,6 @@ impl HashMapSourceSim {
         Self {
             inner: Rc::new(RefCell::new(tmp)),
         }
-
     }
 }
 

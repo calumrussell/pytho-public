@@ -115,7 +115,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.rebalance_cash();
                 //Only triggers when schedule is met
                 self.pay_taxes(&curr_date);
-        
+
                 self.1.isa.rebalance();
                 self.1.gia.rebalance();
                 self.1.sipp.rebalance();
@@ -143,21 +143,22 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
     pub fn get_state(&self) -> UKStack {
         UKStack {
-            isa: self.1.isa.liquidation_value().clone(),
-            gia: self.1.gia.liquidation_value().clone(),
-            sipp: self.1.sipp.liquidation_value().clone(),
+            isa: self.1.isa.liquidation_value(),
+            gia: self.1.gia.liquidation_value(),
+            sipp: self.1.sipp.liquidation_value(),
             bank: self.1.bank.balance.clone(),
         }
     }
 
     pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
-         let curr_date = self.0.clock.borrow().now();
-         if let Some(report) = self.1.reporter.check::<S>(
+        let curr_date = self.0.clock.borrow().now();
+        if let Some(report) = self.1.reporter.check::<S>(
             &self.1.isa.liquidation_value(),
             &self.1.gia.liquidation_value(),
             &self.1.sipp.liquidation_value(),
-            &self.1.bank.balance, 
-            &curr_date) {
+            &self.1.bank.balance,
+            &curr_date,
+        ) {
             self.1.reporter.reset();
             return Some(report);
         }
@@ -197,15 +198,13 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             }
 
             if capital_gains > 0.0 {
-                self 
-                    .1
+                self.1
                     .annual_tax
                     .add_income(UKIncomeInternal::OtherGains(CashValue::from(capital_gains)));
             }
 
             if dividends_received > 0.0 {
-                self
-                    .1
+                self.1
                     .annual_tax
                     .add_income(UKIncomeInternal::Dividend(CashValue::from(
                         dividends_received,
@@ -219,8 +218,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 //not enough then enter unrecoverable state which pauses all forward progress with
                 //simulation
 
-                let cash_value =
-                *self.1.gia.liquidation_value() + *self.1.isa.liquidation_value();
+                let cash_value = *self.1.gia.liquidation_value() + *self.1.isa.liquidation_value();
                 if cash_value < *tax_due {
                     self.1.sim_state = SimState::Unrecoverable;
                     //In unrecoverable state, zero all the accounts
@@ -241,10 +239,8 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             } else {
                 self.1.reporter.paid_tax(&tax_due);
             }
-            self.1.annual_tax = TaxPeriod::with_schedule(
-                self.0.annual_tax_schedule.clone(),
-                self.0.nic_group.clone(),
-            );
+            self.1.annual_tax =
+                TaxPeriod::with_schedule(self.0.annual_tax_schedule.clone(), self.0.nic_group);
         }
     }
 }
@@ -330,7 +326,7 @@ impl Config {
             clock: Rc::clone(&clock),
             contribution_pct: self.contribution_pct,
             emergency_fund_minimum: self.emergency_cash_min,
-            source: src.clone(),
+            source: src,
         };
 
         let mutable = SimMutableState {
