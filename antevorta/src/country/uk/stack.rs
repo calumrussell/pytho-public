@@ -137,7 +137,7 @@ impl<S: InvestmentStrategy> Isa<S> {
         self.current_tax_year_deposits = CashValue::default();
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 
@@ -230,7 +230,7 @@ impl<S: InvestmentStrategy> Gia<S> {
         CashValue::from(sum)
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 
@@ -328,7 +328,7 @@ impl<S: InvestmentStrategy> Sipp<S> {
         self.strat.zero();
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 

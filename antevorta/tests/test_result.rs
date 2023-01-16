@@ -74,5 +74,5 @@ fn sim_result_test() {
         clock.borrow_mut().tick();
         sim.update();
     }
-    assert!(*sim.get_state() > 40_000.0);
+    assert!(*sim.get_state().total_value() > 40_000.0);
 }

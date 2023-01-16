@@ -93,7 +93,7 @@ fn test_that_build_fails_without_all_stacks() {
         sim.update();
     }
 
-    assert!(*sim.get_state() > 0.0);
+    assert!(*sim.get_state().total_value() > 0.0);
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn test_that_percent_of_income_expense_can_build() {
         sim.update();
     }
 
-    assert!(*sim.get_state() > 0.0);
+    assert!(*sim.get_state().total_value() > 0.0);
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn test_that_static_growth_can_build() {
         clock.borrow_mut().tick();
         sim.update();
     }
-    assert!(*sim.get_state() > 0.0)
+    assert!(*sim.get_state().total_value() > 0.0)
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_that_stack_creation_without_value_fails() {
         clock.borrow_mut().tick();
         sim.update();
     }
-    assert!(*sim.get_state() > 0.0)
+    assert!(*sim.get_state().total_value() > 0.0)
 }
 
 #[test]
@@ -292,7 +292,7 @@ fn test_build_that_orders_income_expense_before_income() {
         sim.update();
     }
 
-    assert!(*sim.get_state() > 0.0)
+    assert!(*sim.get_state().total_value() > 0.0)
 }
 
 #[test]
@@ -347,5 +347,5 @@ fn test_that_mortgage_can_build() {
         sim.update();
     }
 
-    assert!(*sim.get_state() > 0.0)
+    assert!(*sim.get_state().total_value() > 0.0)
 }

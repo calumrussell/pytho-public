@@ -99,5 +99,5 @@ fn sim_depositstrategy() {
         clock.borrow_mut().tick();
         sim.update();
     }
-    assert!(*sim.get_state() == 12_000.0);
+    assert!(*sim.get_state().total_value() == 12_000.0);
 }

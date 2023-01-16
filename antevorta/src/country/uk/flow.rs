@@ -4,6 +4,7 @@ use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
 use crate::input::{SimDataSource, HashMapSourceSim};
+use crate::report::FlowReporter;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -148,6 +149,7 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
+            state.1.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
             state.1.annual_tax.add_income(tax_type);
             let contribution = *self.value * state.0.contribution_pct;
@@ -155,6 +157,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for Employment {
             state.1.annual_tax.add_contribution(&contributed);
             let net_pay = *self.value - *contributed + *remainder;
             state.2.paid_income(&net_pay);
+            state.1.reporter.paid_net_income(&net_pay);
             state.1.bank.deposit(&net_pay);
         }
     }
@@ -205,6 +208,7 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
+            state.1.reporter.paid_gross_income(&self.value);
             let contribution = *self.value * state.0.contribution_pct;
             let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
             state.1.annual_tax.add_contribution(&contributed);
@@ -217,6 +221,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
             state.1.annual_tax.add_paye_paid(&paye_paid.total());
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
             state.2.paid_income(&net_pay);
+            state.1.reporter.paid_net_income(&net_pay);
             state.1.bank.deposit(&net_pay);
         }
     }
@@ -267,6 +272,7 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
+            state.1.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
             state.1.annual_tax.add_income(tax_type);
             state.1.bank.deposit(&self.value);
@@ -308,6 +314,7 @@ pub struct Expense {
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
+            state.1.reporter.paid_expense(&self.value);
             state.1.bank.withdraw(&self.value);
         }
     }
@@ -359,6 +366,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
                 let expense_value = self.pct * *state.2.income_paid;
+                state.1.reporter.paid_expense(&expense_value);
                 state.1.bank.withdraw(&expense_value);
             }
         }

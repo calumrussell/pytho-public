@@ -18,6 +18,9 @@ use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
+use crate::report::DefaultUKReporter;
+use crate::report::FlowReporter;
+use crate::report::UKAnnualReport;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -27,20 +30,24 @@ use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
 
+pub struct UKStack {
+    pub isa: CashValue,
+    pub sipp: CashValue,
+    pub gia: CashValue,
+    pub bank: CashValue,
+}
+
+impl UKStack {
+    pub fn total_value(&self) -> CashValue {
+        CashValue::from(*self.isa + *self.sipp + *self.gia + *self.bank)
+    }
+}
+
 pub enum SimState {
     Ready,
     //If in unrecoverable state, all further mutations to state stop should only happen when we run
     //out of money
     Unrecoverable,
-}
-
-pub struct SimAnnualReport {
-    pub isa: CashValue,
-    pub sipp: CashValue,
-    pub gia: CashValue,
-    pub cash: CashValue,
-    pub net_income: CashValue,
-    pub tax_paid: CashValue,
 }
 
 pub struct SimConstants {
@@ -64,20 +71,16 @@ pub struct SimMutableState<S: InvestmentStrategy> {
     pub annual_tax: TaxPeriod,
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
+    pub reporter: DefaultUKReporter,
 }
 
 pub struct SimLoopState {
     pub income_paid: CashValue,
-    pub tax_paid: CashValue,
 }
 
 impl SimLoopState {
     pub fn clear(&mut self) {
         self.income_paid = CashValue::from(0.0);
-    }
-
-    pub fn paid_tax(&mut self, tax_paid: &f64) {
-        self.tax_paid = CashValue::from(*self.tax_paid + *tax_paid);
     }
 
     pub fn paid_income(&mut self, income: &f64) {
@@ -87,7 +90,6 @@ impl SimLoopState {
     pub fn init() -> Self {
         Self {
             income_paid: 0.0.into(),
-            tax_paid: 0.0.into(),
         }
     }
 }
@@ -139,25 +141,25 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
         }
     }
 
-    pub fn get_state(&mut self) -> CashValue {
-        CashValue::from(
-            *self.1.isa.liquidation_value()
-            + *self.1.gia.liquidation_value()
-            + *self.1.sipp.liquidation_value()
-            + *self.1.bank.balance
-        )
+    pub fn get_state(&self) -> UKStack {
+        UKStack {
+            isa: self.1.isa.liquidation_value().clone(),
+            gia: self.1.gia.liquidation_value().clone(),
+            sipp: self.1.sipp.liquidation_value().clone(),
+            bank: self.1.bank.balance.clone(),
+        }
     }
 
-    pub fn get_yearly_state(&mut self, curr_date: &DateTime) -> Option<SimAnnualReport> {
-        if self.1.annual_tax.check_bool(curr_date) {
-            return Some(SimAnnualReport {
-                isa: self.1.isa.liquidation_value(),
-                gia: self.1.gia.liquidation_value(),
-                sipp: self.1.sipp.liquidation_value(),
-                cash: self.1.bank.balance.clone(),
-                net_income: self.2.income_paid.clone(),
-                tax_paid: self.2.tax_paid.clone(),
-            });
+    pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
+         let curr_date = self.0.clock.borrow().now();
+         if let Some(report) = self.1.reporter.check::<S>(
+            &self.1.isa.liquidation_value(),
+            &self.1.gia.liquidation_value(),
+            &self.1.sipp.liquidation_value(),
+            &self.1.bank.balance, 
+            &curr_date) {
+            self.1.reporter.reset();
+            return Some(report);
         }
         None
     }
@@ -228,18 +230,16 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.1.bank.zero();
                 } else if *self.1.isa.liquidation_value() > *tax_due {
                     self.1.isa.liquidate(&tax_due);
-                    self.2.paid_tax(&tax_due);
+                    self.1.reporter.paid_tax(&tax_due);
                 } else {
                     let isa_value = self.1.isa.liquidation_value();
                     self.1.isa.liquidate(&isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.1.gia.liquidate(&remainder);
-
-                    self.2.paid_tax(&isa_value);
-                    self.2.paid_tax(&remainder);
+                    self.1.reporter.paid_tax(&tax_due);
                 }
             } else {
-                self.2.paid_tax(&tax_due);
+                self.1.reporter.paid_tax(&tax_due);
             }
             self.1.annual_tax = TaxPeriod::with_schedule(
                 self.0.annual_tax_schedule.clone(),
@@ -322,6 +322,8 @@ impl Config {
 
         let annual_tax_schedule = Schedule::EveryYear(1, 4);
 
+        let reporter = DefaultUKReporter::new(annual_tax_schedule.clone());
+
         let constants = SimConstants {
             nic_group: self.nic,
             annual_tax_schedule: annual_tax_schedule.clone(),
@@ -340,6 +342,7 @@ impl Config {
             annual_tax: TaxPeriod::with_schedule(annual_tax_schedule, self.nic),
             tax_config: UKTaxConfig::default(),
             sim_state: SimState::Ready,
+            reporter,
         };
 
         let loop_state = SimLoopState::init();
