@@ -110,7 +110,31 @@ const responseSchema = {
       data: {
         type: 'object',
         properties: {
-          values: {
+          total_end_value: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
+          total_value_avg: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
+          tax_paid_avg: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
+          gross_income_avg: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
+          net_income_avg: {
             type: 'array',
             items: {
               type: 'number',
