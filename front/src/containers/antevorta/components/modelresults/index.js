@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import zip from 'lodash.zip';
 
 import {
   useAntevorta,
@@ -11,10 +12,13 @@ import {
   strConverter,
   ComponentWrapper,
   NumberWithTitle,
+  Text,
 } from '@Common';
 import {
   HistogramChart,
+  StackedBarChart,
 } from '@Components/charts';
+import { DefaultHorizontalSpacer } from '@Common/index';
 
 const RowWrapper = styled.div`
   display: flex;
@@ -36,22 +40,40 @@ export const ModelResults = (props) => {
   if (state.results) {
     const {
       runs,
-      values,
+      gross_income_avg,
+      tax_paid_avg,
+      total_end_value,
     } = state.results;
 
-    const avg = values.reduce((acc, curr) => acc+curr, 0) / values.length;
+    const avg = total_end_value.reduce((acc, curr) => acc+curr, 0) / total_end_value.length;
 
+    const years = Array.from(Array(gross_income_avg.length).keys())
+    const after_tax_avg = zip(gross_income_avg, tax_paid_avg)
+      .map(v => v[0] - v[1]);
+
+    const stacked = zip(after_tax_avg, tax_paid_avg);
     return (
       <ComponentWrapper>
-        <HistogramChart
-          runs={ runs }
-          rootId={ 'chart-container-histogram' }
-          values={ values } />
         <RowWrapper>
           <NumberWithTitle
             title={ 'Avg Value' }
             number={ strConverter(avg) } />
         </RowWrapper>
+        <DefaultHorizontalSpacer>
+          <Text light>Distribution of ending total value</Text>
+          <HistogramChart
+            runs={ runs }
+            rootId={ 'chart-container-histogram' }
+            values={ total_end_value } />
+        </DefaultHorizontalSpacer>
+        <DefaultHorizontalSpacer>
+          <Text light>Test</Text>
+          <StackedBarChart
+            labels={ ['Test', 'Test1'] }
+            xValues={ years }
+            rootId={ 'chart-container-gross-income' }
+            yValues={ stacked } />
+        </DefaultHorizontalSpacer>
       </ComponentWrapper>
     );
   } else {

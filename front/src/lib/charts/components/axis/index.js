@@ -176,6 +176,59 @@ export const axisPointBuilder = (chartState) => {
   ];
 };
 
+/*
+* Takes the sum of all values in the yaxis to calculate the high point of the yaxis.
+* Is always bounded by zero at the bottom
+*/
+export const axisStackBuilder = (chartState) => {
+  const {
+    data: {
+      x,
+      y,
+      xGetter,
+      yGetter,
+    },
+    invariants: {
+      size: {
+        height,
+        width,
+        margin,
+      },
+      yAxisMarginAdj,
+    },
+  } = chartState;
+
+  const bottomMargin = yAxisMarginAdj ?
+  height - margin.bottom :
+  height;
+
+  const xAxis = scaleBand()
+      .domain(x)
+      .range([
+        0,
+        width,
+      ])
+      .paddingOuter(0.1)
+      .paddingInner(0.1);
+
+  const sum = (arr) => arr.reduce((curr, val) => curr + val, 0);
+  const maxYVal = max(y, (d) => sum(yGetter(d)));
+
+  const yAxis = scaleLinear()
+      .domain([
+        0,
+        maxYVal,
+      ])
+      .range([
+        bottomMargin,
+        0,
+      ]);
+
+  return [
+    xAxis,
+    yAxis,
+  ];
+};
 
 export const axisBuilder = (chartState) => {
   const {

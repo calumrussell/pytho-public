@@ -22,6 +22,9 @@ import {
   writeGraph as writeBarGraph, reducer as barReducer, init as barInit,
 } from './components/reducers/bar';
 import {
+  writeGraph as writeStackedBarGraph, reducer as stackedBarReducer, init as stackedBarInit,
+} from './components/reducers/stackedbar';
+import {
   TimeButtons,
 } from './components/timebuttons';
 import {
@@ -295,6 +298,72 @@ export const BarChart = ({
 
 BarChart.propTypes = {
   values: PropTypes.array.isRequired,
+  labels: PropTypes.array.isRequired,
+  rootId: PropTypes.string.isRequired,
+};
+
+
+export const StackedBarChart = ({
+  xValues, yValues, labels, rootId,
+}) => {
+  const initState = {
+    ref: createRef(),
+    rootId,
+    data: {
+      labels: labels,
+      x: xValues,
+      y: yValues,
+      xGetter: (d) => d,
+      yGetter: (d) => d,
+    },
+  };
+
+  const [
+    state,
+    dispatch,
+  ] = useReducer(
+      stackedBarReducer, initState, stackedBarInit,
+  );
+
+  const {
+    ref,
+    size: {
+      width,
+      height,
+      margin,
+    },
+    root,
+    rootWrapper,
+  } = state.invariants;
+
+  useEffect(() => {
+    select(ref.current)
+        .append('svg')
+        .attr('id', `${root}`)
+        .attr('viewBox', [
+          0,
+          0,
+          width+margin.left+margin.right,
+          height+margin.top+margin.bottom,
+        ])
+        .append('g')
+        .attr('id', `${rootWrapper}`)
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    writeStackedBarGraph(state, dispatch);
+  }, [
+  ]);
+
+  return (
+    <>
+      <div
+        ref={ ref } />
+    </>
+  );
+};
+
+StackedBarChart.propTypes = {
+  yValues: PropTypes.array.isRequired,
+  xValues: PropTypes.array.isRequired,
   labels: PropTypes.array.isRequired,
   rootId: PropTypes.string.isRequired,
 };

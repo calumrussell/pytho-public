@@ -100,7 +100,7 @@ export const useAntevorta = () => {
             .then((res) => {
               const formattedResults = {
                 runs,
-                values: res.data.values,
+                ...res.data,
               };
               dispatch({type: 'addResults', results: formattedResults});
             })
