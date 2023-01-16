@@ -5,7 +5,7 @@ pub mod sim;
 pub mod stat;
 
 use calcs::{max_dd_threshold_position, DDInput, DDResults};
-use risk::{EodRawRiskInput, risk_analysis};
+use risk::{risk_analysis, EodRawRiskInput};
 use std::panic;
 use wasm_bindgen::prelude::*;
 
@@ -44,5 +44,4 @@ pub fn risk(js_input: JsValue) -> JsValue {
     let input: EodRawRiskInput = serde_wasm_bindgen::from_value(js_input).unwrap();
     let risk_result = risk_analysis(&input);
     serde_wasm_bindgen::to_value(&risk_result).unwrap()
- 
 }

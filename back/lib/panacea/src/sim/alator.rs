@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::iter::zip;
 use std::rc::Rc;
 
-use crate::eod::{ EodRawCommon, EodRow };
+use crate::eod::{EodRawCommon, EodRow};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EodRawAlatorInput {

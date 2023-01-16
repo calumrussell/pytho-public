@@ -1,4 +1,4 @@
-use crate::eod::{EodRow, EodRawCommon};
+use crate::eod::{EodRawCommon, EodRow};
 use crate::stat::build_sample_raw_daily;
 use alator::broker::Quote;
 use alator::clock::ClockBuilder;
@@ -94,15 +94,18 @@ pub struct AntevortaMultipleInput {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaResults {
-    pub values: Vec<f64>,
-    pub net_income: Vec<f64>,
+    pub total_end_value: Vec<f64>,
+    pub total_value_avg: Vec<f64>,
+    pub tax_paid_avg: Vec<f64>,
+    pub gross_income_avg: Vec<f64>,
+    pub net_income_avg: Vec<f64>,
 }
 
 pub fn antevorta_multiple(
     input: AntevortaMultipleInput,
 ) -> Result<AntevortaResults, Box<dyn Error>> {
+    let mut total_end_value = Vec::new();
 
-    let mut result = Vec::new();
     let mut annual_perfs: Vec<Vec<UKAnnualReport>> = Vec::with_capacity(input.runs as usize);
     for _i in 0..input.runs {
         annual_perfs.push(vec![]);
@@ -168,20 +171,46 @@ pub fn antevorta_multiple(
                 curr.push(annual_perf);
             }
         }
-        result.push(*sim.get_state().total_value())
+        total_end_value.push(*sim.get_state().total_value())
     }
 
-    let mut annual_average_income = Vec::new();
+    let mut total_value_avg = Vec::new();
+    let mut tax_paid_avg = Vec::new();
+    let mut gross_income_avg = Vec::new();
+    let mut net_income_avg = Vec::new();
     for i in 0..input.sim_length {
-        let mut annual_income = Vec::new();
+        let mut total_value = Vec::new();
+        let mut tax_paid = Vec::new();
+        let mut gross_income = Vec::new();
+        let mut net_income = Vec::new();
+
         for j in 0..input.runs {
-            let tmp_perf = annual_perfs.get(j as usize).unwrap().get(i as usize).unwrap();
-            annual_income.push(*(tmp_perf.gross_income));
+            let tmp_perf = annual_perfs
+                .get(j as usize)
+                .unwrap()
+                .get(i as usize)
+                .unwrap();
+
+            let value_sum = *tmp_perf.isa + *tmp_perf.gia + *tmp_perf.sipp + *tmp_perf.cash;
+
+            total_value.push(value_sum);
+            tax_paid.push(*(tmp_perf.tax_paid));
+            gross_income.push(*(tmp_perf.gross_income));
+            net_income.push(*(tmp_perf.net_income));
         }
-        annual_average_income.push(annual_income.sum() / annual_income.len() as f64);
+        total_value_avg.push(total_value.sum() / total_value.len() as f64);
+        tax_paid_avg.push(tax_paid.sum() / tax_paid.len() as f64);
+        gross_income_avg.push(gross_income.sum() / gross_income.len() as f64);
+        net_income_avg.push(net_income.sum() / net_income.len() as f64);
     }
 
-    Ok(AntevortaResults { values: result, net_income: annual_average_income })
+    Ok(AntevortaResults {
+        total_end_value,
+        gross_income_avg,
+        net_income_avg,
+        tax_paid_avg,
+        total_value_avg,
+    })
 }
 
 #[cfg(test)]
