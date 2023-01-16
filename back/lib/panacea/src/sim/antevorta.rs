@@ -7,14 +7,15 @@ use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::country::uk::Config;
 use antevorta::input::FakeHashMapSourceSimWithQuotes;
+use antevorta::report::UKAnnualReport;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
+use smartcore::linalg::basic::arrays::ArrayView1;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EodRawAntevortaInput {
@@ -94,6 +95,7 @@ pub struct AntevortaMultipleInput {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaResults {
     pub values: Vec<f64>,
+    pub net_income: Vec<f64>,
 }
 
 pub fn antevorta_multiple(
@@ -101,8 +103,12 @@ pub fn antevorta_multiple(
 ) -> Result<AntevortaResults, Box<dyn Error>> {
 
     let mut result = Vec::new();
-
+    let mut annual_perfs: Vec<Vec<UKAnnualReport>> = Vec::with_capacity(input.runs as usize);
     for _i in 0..input.runs {
+        annual_perfs.push(vec![]);
+    }
+
+    for i in 0..input.runs {
         let start_date = input.dates.first().unwrap().clone();
         let sim_length = (input.sim_length * 365) as i64;
 
@@ -157,11 +163,25 @@ pub fn antevorta_multiple(
         while clock.borrow().has_next() {
             clock.borrow_mut().tick();
             sim.update();
+            if let Some(annual_perf) = sim.get_annual_report() {
+                let curr = annual_perfs.get_mut(i as usize).unwrap();
+                curr.push(annual_perf);
+            }
         }
-
-        result.push(*sim.get_state())
+        result.push(*sim.get_state().total_value())
     }
-    Ok(AntevortaResults { values: result })
+
+    let mut annual_average_income = Vec::new();
+    for i in 0..input.sim_length {
+        let mut annual_income = Vec::new();
+        for j in 0..input.runs {
+            let tmp_perf = annual_perfs.get(j as usize).unwrap().get(i as usize).unwrap();
+            annual_income.push(*(tmp_perf.gross_income));
+        }
+        annual_average_income.push(annual_income.sum() / annual_income.len() as f64);
+    }
+
+    Ok(AntevortaResults { values: result, net_income: annual_average_income })
 }
 
 #[cfg(test)]
