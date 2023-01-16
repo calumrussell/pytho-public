@@ -86,7 +86,8 @@ fn convert_result(res: BacktestOutput) -> AlatorResults {
     let rounded_values: Vec<f64> = res
         .values
         .iter()
-        .map(|x: &f64| (x * 100.0).round() / 100.0)
+        .map(|x: &f64| x / 10000.0)
+        .map(|x: f64| (x * 100.0).round() / 100.0)
         .collect();
 
     AlatorResults {
@@ -133,7 +134,7 @@ pub fn alator_backtest(input: AlatorInput) -> AlatorResults {
         weights.insert(symbol.clone(), *input.weights.get(&symbol.clone()).unwrap());
     }
 
-    let initial_cash = 100.0;
+    let initial_cash = 1e6;
 
     let exchange = DefaultExchangeBuilder::new()
         .with_data_source(source.clone())
