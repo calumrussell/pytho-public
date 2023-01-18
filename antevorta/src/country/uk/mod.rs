@@ -50,7 +50,8 @@ pub enum SimState {
     Unrecoverable,
 }
 
-pub struct SimConstants {
+//Each loop we check for rebalance, check tax, and then check for user-defined income events.
+pub struct UKSimulationState<S: InvestmentStrategy> {
     //Has to be ordered, tax has to be calculated first
     pub nic_group: NIC,
     pub annual_tax_schedule: Schedule,
@@ -58,9 +59,6 @@ pub struct SimConstants {
     pub contribution_pct: f64,
     pub emergency_fund_minimum: f64,
     pub source: HashMapSourceSim,
-}
-
-pub struct SimMutableState<S: InvestmentStrategy> {
     //At the moment, clients are not modifying the actual list of flows but the internal state can
     //change
     pub flows: Vec<Flow>,
@@ -72,69 +70,51 @@ pub struct SimMutableState<S: InvestmentStrategy> {
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
     pub reporter: DefaultUKReporter,
+    pub income_paid_in_curr_loop: CashValue,
 }
-
-pub struct SimLoopState {
-    pub income_paid: CashValue,
-}
-
-impl SimLoopState {
-    pub fn clear(&mut self) {
-        self.income_paid = CashValue::from(0.0);
-    }
-
-    pub fn paid_income(&mut self, income: &f64) {
-        self.income_paid = CashValue::from(*self.income_paid + *income);
-    }
-
-    pub fn init() -> Self {
-        Self {
-            income_paid: 0.0.into(),
-        }
-    }
-}
-
-//Each loop we check for rebalance, check tax, and then check for user-defined income events.
-pub struct UKSimulationState<S: InvestmentStrategy>(
-    pub SimConstants,
-    pub SimMutableState<S>,
-    pub SimLoopState,
-);
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
-    pub fn update(&mut self) {
-        match self.1.sim_state {
-            SimState::Ready => {
-                self.2.clear();
-                self.1.isa.check();
-                self.1.gia.check();
-                self.1.sipp.check();
+    pub fn clear_loop(&mut self) {
+        self.income_paid_in_curr_loop = CashValue::from(0.0);
+    }
 
-                let curr_date = self.0.clock.borrow().now();
+    pub fn paid_income_loop(&mut self, income: &f64) {
+        self.income_paid_in_curr_loop = CashValue::from(*self.income_paid_in_curr_loop + *income);
+    }
+
+    pub fn update(&mut self) {
+        match self.sim_state {
+            SimState::Ready => {
+                self.clear_loop();
+                self.isa.check();
+                self.gia.check();
+                self.sipp.check();
+
+                let curr_date = self.clock.borrow().now();
 
                 self.rebalance_cash();
                 //Only triggers when schedule is met
                 self.pay_taxes(&curr_date);
 
-                self.1.isa.rebalance();
-                self.1.gia.rebalance();
-                self.1.sipp.rebalance();
+                self.isa.rebalance();
+                self.gia.rebalance();
+                self.sipp.rebalance();
 
                 //We cannot pass the reference to self to flows whilst iterating over flows which are also
                 //on self, we therefore need to clone
-                let mut cloned_flows: Vec<Flow> = self.1.flows.to_vec();
+                let mut cloned_flows: Vec<Flow> = self.flows.to_vec();
                 for flow in cloned_flows.iter_mut() {
                     flow.check(&curr_date, self);
                 }
                 //The internal state of the flows may have changed here, so we need to overwite flows on
                 //self
-                self.1.flows = cloned_flows;
+                self.flows = cloned_flows;
 
                 self.rebalance_cash();
 
-                self.1.isa.finish();
-                self.1.gia.finish();
-                self.1.sipp.finish();
+                self.isa.finish();
+                self.gia.finish();
+                self.sipp.finish();
             }
             //If unrecoverable then no further updates
             SimState::Unrecoverable => {}
@@ -143,104 +123,102 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
     pub fn get_state(&self) -> UKStack {
         UKStack {
-            isa: self.1.isa.liquidation_value(),
-            gia: self.1.gia.liquidation_value(),
-            sipp: self.1.sipp.liquidation_value(),
-            bank: self.1.bank.balance.clone(),
+            isa: self.isa.liquidation_value(),
+            gia: self.gia.liquidation_value(),
+            sipp: self.sipp.liquidation_value(),
+            bank: self.bank.balance.clone(),
         }
     }
 
     pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
-        let curr_date = self.0.clock.borrow().now();
-        if let Some(report) = self.1.reporter.check::<S>(
-            &self.1.isa.liquidation_value(),
-            &self.1.gia.liquidation_value(),
-            &self.1.sipp.liquidation_value(),
-            &self.1.bank.balance,
+        let curr_date = self.clock.borrow().now();
+        if let Some(report) = self.reporter.check::<S>(
+            &self.isa.liquidation_value(),
+            &self.gia.liquidation_value(),
+            &self.sipp.liquidation_value(),
+            &self.bank.balance,
             &curr_date,
         ) {
-            self.1.reporter.reset();
+            self.reporter.reset();
             return Some(report);
         }
         None
     }
 
     fn rebalance_cash(&mut self) {
-        let bank_bal = *self.1.bank.balance;
-        let excess_cash = bank_bal - self.0.emergency_fund_minimum;
+        let bank_bal = *self.bank.balance;
+        let excess_cash = bank_bal - self.emergency_fund_minimum;
         if excess_cash > 0.0 {
-            self.1.bank.withdraw(&excess_cash);
+            self.bank.withdraw(&excess_cash);
             //If we are over ISA deposit limit, invest what is possible then return the remainder
             //which can go into GIA
-            let (_deposited, remainder) = self.1.isa.deposit_wrapper(&excess_cash);
+            let (_deposited, remainder) = self.isa.deposit_wrapper(&excess_cash);
             if *remainder > 0.0 {
-                self.1.gia.deposit(&remainder);
+                self.gia.deposit(&remainder);
             }
         }
     }
 
     fn pay_taxes(&mut self, curr_date: &DateTime) {
-        if self.1.annual_tax.check_bool(curr_date) {
+        if self.annual_tax.check_bool(curr_date) {
             //Inflation is annualized but with daily frequency, so we should always have an annual
             //number
-            let inflation = self.0.source.get_current_inflation().unwrap();
-            let curr_config = &self.1.tax_config;
+            let inflation = self.source.get_current_inflation().unwrap();
+            let curr_config = &self.tax_config;
             let new_config = curr_config.apply_inflation(&inflation);
-            self.1.tax_config = new_config.clone();
+            self.tax_config = new_config.clone();
 
             let mut capital_gains = 0.0;
             let mut dividends_received = 0.0;
 
             //Assumes that we are correctly calling this on the last day of the current tax year
-            if let Some(period_start) = self.0.annual_tax_schedule.last_period(curr_date) {
-                capital_gains += *self.1.gia.get_capital_gains(curr_date, &period_start);
-                dividends_received += *self.1.gia.get_dividends(curr_date, &period_start);
+            if let Some(period_start) = self.annual_tax_schedule.last_period(curr_date) {
+                capital_gains += *self.gia.get_capital_gains(curr_date, &period_start);
+                dividends_received += *self.gia.get_dividends(curr_date, &period_start);
             }
 
             if capital_gains > 0.0 {
-                self.1
-                    .annual_tax
+                self.annual_tax
                     .add_income(UKIncomeInternal::OtherGains(CashValue::from(capital_gains)));
             }
 
             if dividends_received > 0.0 {
-                self.1
-                    .annual_tax
+                self.annual_tax
                     .add_income(UKIncomeInternal::Dividend(CashValue::from(
                         dividends_received,
                     )));
             }
 
-            let output = self.1.annual_tax.calc(&new_config);
+            let output = self.annual_tax.calc(&new_config);
             let tax_due = output.total();
-            if let TransferResult::Failure = self.1.bank.withdraw(&tax_due) {
+            if let TransferResult::Failure = self.bank.withdraw(&tax_due) {
                 //Not enough cash in bank to pay taxes, liquidate cash accounts if there is still
                 //not enough then enter unrecoverable state which pauses all forward progress with
                 //simulation
 
-                let cash_value = *self.1.gia.liquidation_value() + *self.1.isa.liquidation_value();
+                let cash_value = *self.gia.liquidation_value() + *self.isa.liquidation_value();
                 if cash_value < *tax_due {
-                    self.1.sim_state = SimState::Unrecoverable;
+                    self.sim_state = SimState::Unrecoverable;
                     //In unrecoverable state, zero all the accounts
-                    self.1.gia.zero();
-                    self.1.isa.zero();
-                    self.1.sipp.zero();
-                    self.1.bank.zero();
-                } else if *self.1.isa.liquidation_value() > *tax_due {
-                    self.1.isa.liquidate(&tax_due);
-                    self.1.reporter.paid_tax(&tax_due);
+                    self.gia.zero();
+                    self.isa.zero();
+                    self.sipp.zero();
+                    self.bank.zero();
+                } else if *self.isa.liquidation_value() > *tax_due {
+                    self.isa.liquidate(&tax_due);
+                    self.reporter.paid_tax(&tax_due);
                 } else {
-                    let isa_value = self.1.isa.liquidation_value();
-                    self.1.isa.liquidate(&isa_value);
+                    let isa_value = self.isa.liquidation_value();
+                    self.isa.liquidate(&isa_value);
                     let remainder = *tax_due - *isa_value;
-                    self.1.gia.liquidate(&remainder);
-                    self.1.reporter.paid_tax(&tax_due);
+                    self.gia.liquidate(&remainder);
+                    self.reporter.paid_tax(&tax_due);
                 }
             } else {
-                self.1.reporter.paid_tax(&tax_due);
+                self.reporter.paid_tax(&tax_due);
             }
-            self.1.annual_tax =
-                TaxPeriod::with_schedule(self.0.annual_tax_schedule.clone(), self.0.nic_group);
+            self.annual_tax =
+                TaxPeriod::with_schedule(self.annual_tax_schedule.clone(), self.nic_group);
         }
     }
 }
@@ -320,16 +298,13 @@ impl Config {
 
         let reporter = DefaultUKReporter::new(annual_tax_schedule.clone());
 
-        let constants = SimConstants {
+        UKSimulationState {
             nic_group: self.nic,
             annual_tax_schedule: annual_tax_schedule.clone(),
             clock: Rc::clone(&clock),
             contribution_pct: self.contribution_pct,
             emergency_fund_minimum: self.emergency_cash_min,
             source: src,
-        };
-
-        let mutable = SimMutableState {
             flows,
             bank,
             gia: gia.unwrap(),
@@ -339,11 +314,8 @@ impl Config {
             tax_config: UKTaxConfig::default(),
             sim_state: SimState::Ready,
             reporter,
-        };
-
-        let loop_state = SimLoopState::init();
-
-        UKSimulationState(constants, mutable, loop_state)
+            income_paid_in_curr_loop: 0.0.into(),
+        }
     }
 
     pub fn parse(json_str: &str) -> Result<Config, Error> {

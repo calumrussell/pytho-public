@@ -151,16 +151,16 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.1.reporter.paid_gross_income(&self.value);
+            state.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
-            state.1.annual_tax.add_income(tax_type);
-            let contribution = *self.value * state.0.contribution_pct;
-            let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
-            state.1.annual_tax.add_contribution(&contributed);
+            state.annual_tax.add_income(tax_type);
+            let contribution = *self.value * state.contribution_pct;
+            let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
+            state.annual_tax.add_contribution(&contributed);
             let net_pay = *self.value - *contributed + *remainder;
-            state.2.paid_income(&net_pay);
-            state.1.reporter.paid_net_income(&net_pay);
-            state.1.bank.deposit(&net_pay);
+            state.paid_income_loop(&net_pay);
+            state.reporter.paid_net_income(&net_pay);
+            state.bank.deposit(&net_pay);
         }
     }
 
@@ -210,21 +210,21 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.1.reporter.paid_gross_income(&self.value);
-            let contribution = *self.value * state.0.contribution_pct;
-            let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
-            state.1.annual_tax.add_contribution(&contributed);
+            state.reporter.paid_gross_income(&self.value);
+            let contribution = *self.value * state.contribution_pct;
+            let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
+            state.annual_tax.add_contribution(&contributed);
             let paye_paid = TaxPeriod::paye(
                 &self.value,
                 &contributed,
-                state.0.nic_group,
-                &state.1.tax_config,
+                state.nic_group,
+                &state.tax_config,
             );
-            state.1.annual_tax.add_paye_paid(&paye_paid.total());
+            state.annual_tax.add_paye_paid(&paye_paid.total());
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
-            state.2.paid_income(&net_pay);
-            state.1.reporter.paid_net_income(&net_pay);
-            state.1.bank.deposit(&net_pay);
+            state.paid_income_loop(&net_pay);
+            state.reporter.paid_net_income(&net_pay);
+            state.bank.deposit(&net_pay);
         }
     }
 
@@ -274,11 +274,11 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.1.reporter.paid_gross_income(&self.value);
+            state.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
-            state.1.annual_tax.add_income(tax_type);
-            state.1.bank.deposit(&self.value);
-            state.2.paid_income(&self.value);
+            state.annual_tax.add_income(tax_type);
+            state.bank.deposit(&self.value);
+            state.paid_income_loop(&self.value);
         }
     }
 
@@ -316,8 +316,8 @@ pub struct Expense {
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.1.reporter.paid_expense(&self.value);
-            state.1.bank.withdraw(&self.value);
+            state.reporter.paid_expense(&self.value);
+            state.bank.withdraw(&self.value);
         }
     }
 
@@ -362,14 +362,14 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
             //This is correct, tried to fiddle with this and we need to make sure that income runs
             //before expense. If this isn't true then the simulation cannot continue/we generate
             //lots of erroneous transactions.
-            if *state.2.income_paid <= 0.0 {
+            if *state.income_paid_in_curr_loop <= 0.0 {
                 //Panic here because if this hits then the caller likely made an error in the
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
-                let expense_value = self.pct * *state.2.income_paid;
-                state.1.reporter.paid_expense(&expense_value);
-                state.1.bank.withdraw(&expense_value);
+                let expense_value = self.pct * *state.income_paid_in_curr_loop;
+                state.reporter.paid_expense(&expense_value);
+                state.bank.withdraw(&expense_value);
             }
         }
     }
