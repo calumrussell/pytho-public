@@ -8,6 +8,9 @@ import {
 import {
   select,
 } from 'd3-selection';
+import {
+  stack
+} from 'd3-shape';
 
 import {
   writeGraph, reducer, init,
@@ -306,13 +309,18 @@ BarChart.propTypes = {
 export const StackedBarChart = ({
   xValues, yValues, labels, rootId,
 }) => {
+
+  const stackFunc = stack()
+    .keys(labels);
+  const series = stackFunc(yValues);
+
   const initState = {
     ref: createRef(),
     rootId,
     data: {
       labels: labels,
       x: xValues,
-      y: yValues,
+      y: series,
       xGetter: (d) => d,
       yGetter: (d) => d,
     },

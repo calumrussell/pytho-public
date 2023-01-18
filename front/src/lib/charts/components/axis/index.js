@@ -8,8 +8,9 @@ import {
   axisBottom, axisLeft,
 } from 'd3-axis';
 import {
-  extent, max, min,
+  extent, max, min, merge,
 } from 'd3-array';
+import zip from 'lodash.zip';
 
 export const writeAxis = ( chartState, axis ) => {
   const [
@@ -185,8 +186,6 @@ export const axisStackBuilder = (chartState) => {
     data: {
       x,
       y,
-      xGetter,
-      yGetter,
     },
     invariants: {
       size: {
@@ -211,9 +210,7 @@ export const axisStackBuilder = (chartState) => {
       .paddingOuter(0.1)
       .paddingInner(0.1);
 
-  const sum = (arr) => arr.reduce((curr, val) => curr + val, 0);
-  const maxYVal = max(y, (d) => sum(yGetter(d)));
-
+  const maxYVal = max(merge(merge(y))) * 1.1;
   const yAxis = scaleLinear()
       .domain([
         0,

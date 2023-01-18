@@ -4,6 +4,9 @@ import {
 import {
   writeStackedRect,
 } from '../../element';
+import {
+  writeLegend,
+} from '../../legend';
 
 export const init = ({
   data, ref, rootId,
@@ -14,7 +17,13 @@ export const init = ({
     invariants: {
       ref,
       colours: [
-        '#90E39A',
+        "#222222",
+        "#474747",
+        "#686868",
+        "#878787",
+        "#a7a7a7",
+        "#c6c6c6",
+        "#dedede",
       ],
       root: rootId,
       rootWrapper: `${rootId}-bar-wrapper`,
@@ -45,6 +54,7 @@ export const writeGraph = (state, dispatch) => {
   writeAxis(state, axis);
   // No build stage for rectangles
   writeStackedRect(state, axis);
+  writeLegend(state);
 
   // Save primitives
   dispatch({

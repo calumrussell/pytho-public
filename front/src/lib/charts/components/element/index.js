@@ -4,7 +4,6 @@ import {
 import {
   line,
 } from 'd3-shape';
-import zip from 'lodash.zip';
 
 export const writeLine = (chartState, line) => {
   const {
@@ -159,6 +158,7 @@ export const writeStackedRect = (chartState, axis) => {
 
   const {
     invariants: {
+      colours,
       rootWrapper,
       size: {
         height,
@@ -178,16 +178,18 @@ export const writeStackedRect = (chartState, axis) => {
   select(`#${rootWrapper}`)
       .append('g')
       .attr('class', 'chart-bars')
-      .selectAll('rect')
+      .selectAll('g')
       .data(yValues)
-      .enter()
-      .append('rect')
+      .join('g')
+      .attr('fill', (d,i) => colours[i])
+      .selectAll('rect')
+      .data((d) => d)
+      .join('rect')
       .attr('class', 'chart-bar')
       .attr('transform', translateFunc)
       .attr('x', (d, i) => x(xGetter(xValues[i])))
-      .attr('y', (d) => y(yGetter(d)))
-      .attr('fill', 'var(--off-background-color)')
+      .attr('y', (d) => Math.min(y(d[0]), y(d[1])))
       .attr('width', x.bandwidth())
-      .attr('height', (d) => height - y(yGetter(d)));
+      .attr('height', (d) => Math.abs(y(d[1]) - y(d[0])))
 };
 
