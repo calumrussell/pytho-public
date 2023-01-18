@@ -4,7 +4,6 @@ use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
 use crate::input::{HashMapSourceSim, SimDataSource};
-use crate::report::FlowReporter;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -151,16 +150,17 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
             state.annual_tax.add_income(tax_type);
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
             state.annual_tax.add_contribution(&contributed);
             let net_pay = *self.value - *contributed + *remainder;
-            state.paid_income_loop(&net_pay);
-            state.reporter.paid_net_income(&net_pay);
             state.bank.deposit(&net_pay);
+
+            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
+            state.net_income_annual_sum = state.net_income_annual_sum.clone() + net_pay.into();
+            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -210,7 +210,6 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.reporter.paid_gross_income(&self.value);
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
             state.annual_tax.add_contribution(&contributed);
@@ -222,9 +221,11 @@ impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
             );
             state.annual_tax.add_paye_paid(&paye_paid.total());
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
-            state.paid_income_loop(&net_pay);
-            state.reporter.paid_net_income(&net_pay);
             state.bank.deposit(&net_pay);
+
+            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
+            state.net_income_annual_sum = state.net_income_annual_sum.clone() + net_pay.into();
+            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -274,11 +275,12 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.reporter.paid_gross_income(&self.value);
             let tax_type: UKTaxableIncome = self.clone().into();
             state.annual_tax.add_income(tax_type);
             state.bank.deposit(&self.value);
-            state.paid_income_loop(&self.value);
+
+            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
+            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + self.value.clone();
         }
     }
 
@@ -316,7 +318,7 @@ pub struct Expense {
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.reporter.paid_expense(&self.value);
+            state.expense_annual_sum = state.expense_annual_sum.clone() + self.value.clone().into();
             state.bank.withdraw(&self.value);
         }
     }
@@ -368,7 +370,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
                 let expense_value = self.pct * *state.income_paid_in_curr_loop;
-                state.reporter.paid_expense(&expense_value);
+                state.expense_annual_sum = state.expense_annual_sum.clone() + expense_value.into();
                 state.bank.withdraw(&expense_value);
             }
         }

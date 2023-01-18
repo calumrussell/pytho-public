@@ -18,8 +18,6 @@ use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
-use crate::report::DefaultUKReporter;
-use crate::report::FlowReporter;
 use crate::report::UKAnnualReport;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
@@ -69,17 +67,23 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub annual_tax: TaxPeriod,
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
-    pub reporter: DefaultUKReporter,
     pub income_paid_in_curr_loop: CashValue,
+    pub gross_income_annual_sum: CashValue,
+    pub net_income_annual_sum: CashValue,
+    pub expense_annual_sum: CashValue,
+    pub tax_paid_annual_sum: CashValue,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
-    pub fn clear_loop(&mut self) {
-        self.income_paid_in_curr_loop = CashValue::from(0.0);
+    pub fn clear_annual(&mut self) {
+        self.gross_income_annual_sum = CashValue::from(0.0);
+        self.net_income_annual_sum = CashValue::from(0.0);
+        self.expense_annual_sum = CashValue::from(0.0);
+        self.tax_paid_annual_sum = CashValue::from(0.0);
     }
 
-    pub fn paid_income_loop(&mut self, income: &f64) {
-        self.income_paid_in_curr_loop = CashValue::from(*self.income_paid_in_curr_loop + *income);
+    pub fn clear_loop(&mut self) {
+        self.income_paid_in_curr_loop = CashValue::from(0.0);
     }
 
     pub fn update(&mut self) {
@@ -132,14 +136,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
     pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
         let curr_date = self.clock.borrow().now();
-        if let Some(report) = self.reporter.check::<S>(
-            &self.isa.liquidation_value(),
-            &self.gia.liquidation_value(),
-            &self.sipp.liquidation_value(),
-            &self.bank.balance,
-            &curr_date,
-        ) {
-            self.reporter.reset();
+        if self.annual_tax_schedule.check(&curr_date) {
+            let report = UKAnnualReport {
+                isa: self.isa.liquidation_value(),
+                gia: self.gia.liquidation_value(),
+                sipp: self.sipp.liquidation_value(),
+                cash: self.bank.balance.clone(),
+                gross_income: self.gross_income_annual_sum.clone(),
+                net_income: self.net_income_annual_sum.clone(),
+                expense: self.expense_annual_sum.clone(),
+                tax_paid: self.tax_paid_annual_sum.clone(),
+            };
+            self.clear_annual();
             return Some(report);
         }
         None
@@ -206,16 +214,16 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.bank.zero();
                 } else if *self.isa.liquidation_value() > *tax_due {
                     self.isa.liquidate(&tax_due);
-                    self.reporter.paid_tax(&tax_due);
+                    self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
                 } else {
                     let isa_value = self.isa.liquidation_value();
                     self.isa.liquidate(&isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.gia.liquidate(&remainder);
-                    self.reporter.paid_tax(&tax_due);
+                    self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
                 }
             } else {
-                self.reporter.paid_tax(&tax_due);
+                self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
             }
             self.annual_tax =
                 TaxPeriod::with_schedule(self.annual_tax_schedule.clone(), self.nic_group);
@@ -296,8 +304,6 @@ impl Config {
 
         let annual_tax_schedule = Schedule::EveryYear(1, 4);
 
-        let reporter = DefaultUKReporter::new(annual_tax_schedule.clone());
-
         UKSimulationState {
             nic_group: self.nic,
             annual_tax_schedule: annual_tax_schedule.clone(),
@@ -313,9 +319,13 @@ impl Config {
             annual_tax: TaxPeriod::with_schedule(annual_tax_schedule, self.nic),
             tax_config: UKTaxConfig::default(),
             sim_state: SimState::Ready,
-            reporter,
             income_paid_in_curr_loop: 0.0.into(),
+            expense_annual_sum: 0.0.into(),
+            gross_income_annual_sum: 0.0.into(),
+            net_income_annual_sum: 0.0.into(),
+            tax_paid_annual_sum: 0.0.into(),
         }
+
     }
 
     pub fn parse(json_str: &str) -> Result<Config, Error> {
