@@ -1,7 +1,7 @@
 use alator::types::CashValue;
 
 use super::income::IncomeTax;
-use super::{TaxPeriod, UKTaxConfig};
+use super::{UKTaxConfig, UKTaxInput};
 
 #[derive(Debug)]
 pub struct CapitalGainsTaxOutput(CashValue);
@@ -18,8 +18,8 @@ impl CapitalGainsTaxOutput {
 
 pub struct CapitalGainsTax;
 impl CapitalGainsTax {
-    pub fn calc(period: &TaxPeriod, config: &UKTaxConfig) -> CapitalGainsTaxOutput {
-        let capital_gains = period.capital();
+    pub fn calc(period: &UKTaxInput, config: &UKTaxConfig) -> CapitalGainsTaxOutput {
+        let capital_gains = period.capital_gains.clone();
 
         let taxable_income = IncomeTax::taxable_income(period);
         //TODO: Probably need to be reduced for income over 100k

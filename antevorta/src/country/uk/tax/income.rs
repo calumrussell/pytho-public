@@ -1,9 +1,8 @@
 use alator::types::CashValue;
 
-use crate::country::uk::tax::TaxPeriod;
 use crate::tax::ThresholdCalculator;
 
-use super::UKTaxConfig;
+use super::{UKTaxConfig, UKTaxInput};
 
 fn basic(total_income: &f64, is_paye: bool, config: &UKTaxConfig) -> CashValue {
     let mut allowance_taper_threshold = *config.personal_allowance_taper_threshold_band;
@@ -150,13 +149,13 @@ impl IncomeTaxOutput {
 
 pub struct IncomeTax;
 impl IncomeTax {
-    pub fn calc(period: &TaxPeriod, config: &UKTaxConfig) -> IncomeTaxOutput {
-        let taxable_income_net_pension = Self::taxable_income(period);
+    pub fn calc(input: &UKTaxInput, config: &UKTaxConfig) -> IncomeTaxOutput {
+        let taxable_income_net_pension = Self::taxable_income(input);
         let basic = basic(&taxable_income_net_pension, false, config);
         let higher = higher(&taxable_income_net_pension, false, config);
         let additional = additional(&taxable_income_net_pension, false, config);
 
-        let allowances = Self::allowances(period, &basic, &higher, &additional, config);
+        let allowances = Self::allowances(input, &basic, &higher, &additional, config);
         IncomeTaxOutput(
             basic,
             higher,
@@ -167,16 +166,16 @@ impl IncomeTax {
     }
 
     fn allowances(
-        period: &TaxPeriod,
+        period: &UKTaxInput,
         basic: &CashValue,
         higher: &CashValue,
         additional: &CashValue,
         config: &UKTaxConfig,
     ) -> CashValue {
-        let total_income = period.income();
-        let savings_income = period.savings_income();
-        let rental_income = period.rental_income();
-        let self_employment_income = period.self_employment_income();
+        let total_income = period.non_paye_employment.clone();
+        let savings_income = period.savings.clone();
+        let rental_income = period.rental.clone();
+        let self_employment_income = period.self_employment.clone();
 
         let saving_allowance =
             personal_savings_allowance(&savings_income, basic, higher, additional, config);
@@ -192,11 +191,11 @@ impl IncomeTax {
         )
     }
 
-    pub fn taxable_income(period: &TaxPeriod) -> CashValue {
-        let total_income = period.income();
+    pub fn taxable_income(input: &UKTaxInput) -> CashValue {
+        let total_income = input.non_paye_employment.clone();
         //in SIPP account, and we only pass contribution after we are
         //sure that it can be deposited into account with breaking limits
-        let total_contributions = period.contributions();
+        let total_contributions = input.contributions.clone();
         CashValue::from(*total_income - *total_contributions)
     }
 }
@@ -228,11 +227,11 @@ pub struct DividendTax;
 
 impl DividendTax {
     pub fn calc(
-        period: &TaxPeriod,
+        period: &UKTaxInput,
         income_tax: &IncomeTaxOutput,
         config: &UKTaxConfig,
     ) -> CashValue {
-        let dividend = period.dividend();
+        let dividend = period.dividend.clone();
 
         let allowance = *config.dividend_allowance_band;
         let basic = config.basic_dividend_rate;

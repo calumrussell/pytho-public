@@ -2,8 +2,8 @@ pub mod flow;
 mod stack;
 mod tax;
 
-use self::flow::UKIncomeInternal;
 pub use self::tax::NIC;
+use self::tax::UKTaxInput;
 
 use alator::types::DateTime;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,6 @@ use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
-use crate::report::UKAnnualReport;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -27,6 +26,18 @@ use flow::{Employment, EmploymentPAYE, Expense, PctOfIncomeExpense, Rental};
 use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
+
+#[derive(Clone, Debug)]
+pub struct UKAnnualReport {
+    pub isa: CashValue,
+    pub sipp: CashValue,
+    pub gia: CashValue,
+    pub cash: CashValue,
+    pub gross_income: CashValue,
+    pub net_income: CashValue,
+    pub expense: CashValue,
+    pub tax_paid: CashValue,
+}
 
 pub struct UKStack {
     pub isa: CashValue,
@@ -64,7 +75,6 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub sipp: Sipp<S>,
     pub gia: Gia<S>,
     pub isa: Isa<S>,
-    pub annual_tax: TaxPeriod,
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
     pub income_paid_in_curr_loop: CashValue,
@@ -72,6 +82,13 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub net_income_annual_sum: CashValue,
     pub expense_annual_sum: CashValue,
     pub tax_paid_annual_sum: CashValue,
+    pub income_annual_tax:CashValue,
+    pub paye_income_annual_tax: CashValue,
+    pub paye_paid_annual_tax: CashValue,
+    pub savings_income_annual_tax: CashValue,
+    pub rental_income_annual_tax: CashValue,
+    pub self_employment_income_annual_tax: CashValue,
+    pub contributions_annual_tax: CashValue,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
@@ -80,6 +97,16 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
         self.net_income_annual_sum = CashValue::from(0.0);
         self.expense_annual_sum = CashValue::from(0.0);
         self.tax_paid_annual_sum = CashValue::from(0.0);
+    }
+    
+    pub fn clear_tax(&mut self) {
+        self.income_annual_tax = CashValue::from(0.0);
+        self.paye_income_annual_tax = CashValue::from(0.0);
+        self.paye_paid_annual_tax = CashValue::from(0.0);
+        self.savings_income_annual_tax = CashValue::from(0.0);
+        self.rental_income_annual_tax = CashValue::from(0.0);
+        self.self_employment_income_annual_tax = CashValue::from(0.0);
+        self.contributions_annual_tax = CashValue::from(0.0);
     }
 
     pub fn clear_loop(&mut self) {
@@ -168,7 +195,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     }
 
     fn pay_taxes(&mut self, curr_date: &DateTime) {
-        if self.annual_tax.check_bool(curr_date) {
+        if self.annual_tax_schedule.check(curr_date) {
             //Inflation is annualized but with daily frequency, so we should always have an annual
             //number
             let inflation = self.source.get_current_inflation().unwrap();
@@ -185,19 +212,20 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 dividends_received += *self.gia.get_dividends(curr_date, &period_start);
             }
 
-            if capital_gains > 0.0 {
-                self.annual_tax
-                    .add_income(UKIncomeInternal::OtherGains(CashValue::from(capital_gains)));
-            }
-
-            if dividends_received > 0.0 {
-                self.annual_tax
-                    .add_income(UKIncomeInternal::Dividend(CashValue::from(
-                        dividends_received,
-                    )));
-            }
-
-            let output = self.annual_tax.calc(&new_config);
+            let input = UKTaxInput {
+                non_paye_employment: self.income_annual_tax.clone(),
+                paye_employment: self.paye_income_annual_tax.clone(),
+                paye_tax_paid: self.paye_paid_annual_tax.clone(),
+                rental: self.rental_income_annual_tax.clone(),
+                savings: self.savings_income_annual_tax.clone(),
+                self_employment: self.self_employment_income_annual_tax.clone(),
+                ni: self.nic_group,
+                contributions: self.contributions_annual_tax.clone(),
+                capital_gains: capital_gains.into(),
+                dividend: dividends_received.into(),
+            };
+            
+            let output = TaxPeriod::calc(&input, &self.tax_config);
             let tax_due = output.total();
             if let TransferResult::Failure = self.bank.withdraw(&tax_due) {
                 //Not enough cash in bank to pay taxes, liquidate cash accounts if there is still
@@ -225,8 +253,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             } else {
                 self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
             }
-            self.annual_tax =
-                TaxPeriod::with_schedule(self.annual_tax_schedule.clone(), self.nic_group);
+            self.clear_tax();
         }
     }
 }
@@ -316,7 +343,6 @@ impl Config {
             gia: gia.unwrap(),
             sipp: sipp.unwrap(),
             isa: isa.unwrap(),
-            annual_tax: TaxPeriod::with_schedule(annual_tax_schedule, self.nic),
             tax_config: UKTaxConfig::default(),
             sim_state: SimState::Ready,
             income_paid_in_curr_loop: 0.0.into(),
@@ -324,8 +350,14 @@ impl Config {
             gross_income_annual_sum: 0.0.into(),
             net_income_annual_sum: 0.0.into(),
             tax_paid_annual_sum: 0.0.into(),
+            contributions_annual_tax: 0.0.into(),
+            income_annual_tax: 0.0.into(),
+            paye_income_annual_tax: 0.0.into(),
+            paye_paid_annual_tax: 0.0.into(),
+            rental_income_annual_tax: 0.0.into(),
+            savings_income_annual_tax: 0.0.into(),
+            self_employment_income_annual_tax: 0.0.into(),
         }
-
     }
 
     pub fn parse(json_str: &str) -> Result<Config, Error> {

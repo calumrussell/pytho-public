@@ -7,7 +7,7 @@ use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
-use super::tax::{TaxPeriod, UKTaxableIncome};
+use super::tax::TaxPeriod;
 use super::UKSimulationState;
 
 trait WillFlow<S: InvestmentStrategy> {
@@ -150,11 +150,11 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let tax_type: UKTaxableIncome = self.clone().into();
-            state.annual_tax.add_income(tax_type);
+            state.income_annual_tax = state.income_annual_tax.clone() + self.value.clone();
+
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.annual_tax.add_contribution(&contributed);
+            state.contributions_annual_tax = state.contributions_annual_tax.clone() + contributed.clone();
             let net_pay = *self.value - *contributed + *remainder;
             state.bank.deposit(&net_pay);
 
@@ -195,12 +195,6 @@ impl Employment {
     }
 }
 
-impl From<Employment> for UKTaxableIncome {
-    fn from(val: Employment) -> Self {
-        UKTaxableIncome::Wage(val.value)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct EmploymentPAYE {
     value: CashValue,
@@ -210,18 +204,26 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
+
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.annual_tax.add_contribution(&contributed);
+            state.contributions_annual_tax = state.contributions_annual_tax.clone() + contributed.clone();
+
             let paye_paid = TaxPeriod::paye(
                 &self.value,
                 &contributed,
                 state.nic_group,
                 &state.tax_config,
             );
-            state.annual_tax.add_paye_paid(&paye_paid.total());
+            //We don't deduct paye paid from bank but deduct it straight from gross_pay
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
             state.bank.deposit(&net_pay);
+
+            state.paye_income_annual_tax = state.paye_income_annual_tax.clone() + net_pay.into();
+            state.paye_paid_annual_tax = state.paye_paid_annual_tax.clone() + paye_paid.total();
+            //We have to do this twice because this counter is used for reporting
+            //TODO: integrate the reporting with tax calculations add paye_paid to the reporting
+            state.tax_paid_annual_sum = state.tax_paid_annual_sum.clone() + paye_paid.total();
 
             state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
             state.net_income_annual_sum = state.net_income_annual_sum.clone() + net_pay.into();
@@ -260,12 +262,6 @@ impl EmploymentPAYE {
     }
 }
 
-impl From<EmploymentPAYE> for UKTaxableIncome {
-    fn from(val: EmploymentPAYE) -> Self {
-        UKTaxableIncome::WagePAYE(val.value)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Rental {
     value: CashValue,
@@ -275,8 +271,7 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let tax_type: UKTaxableIncome = self.clone().into();
-            state.annual_tax.add_income(tax_type);
+            state.rental_income_annual_tax = state.rental_income_annual_tax.clone() + self.value.clone();
             state.bank.deposit(&self.value);
 
             state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
@@ -300,12 +295,6 @@ impl Rental {
 
     pub fn flow(value: CashValue, schedule: Schedule) -> Flow {
         Flow::Rental(Self::new(value, schedule))
-    }
-}
-
-impl From<Rental> for UKTaxableIncome {
-    fn from(val: Rental) -> Self {
-        UKTaxableIncome::Rental(val.value)
     }
 }
 
@@ -395,25 +384,3 @@ impl PctOfIncomeExpense {
     }
 }
 
-/*
- * Income that is created outside of the main simulator loop, for example capital gains on
- * portfolio transactions.
- * Reason to distinguish this type of income is that other types of income can grow or be set by
- * the client before the simulation starts running. With these types of income, they are only
- * created during a simulation in response to the output of the simulation's internal state.
- */
-pub enum UKIncomeInternal {
-    Dividend(CashValue),
-    ResiPropertyGain(CashValue),
-    OtherGains(CashValue),
-}
-
-impl From<UKIncomeInternal> for UKTaxableIncome {
-    fn from(inc: UKIncomeInternal) -> Self {
-        match inc {
-            UKIncomeInternal::Dividend(value) => UKTaxableIncome::Dividend(value),
-            UKIncomeInternal::ResiPropertyGain(value) => UKTaxableIncome::ResiPropertyGains(value),
-            UKIncomeInternal::OtherGains(value) => UKTaxableIncome::OtherGains(value),
-        }
-    }
-}

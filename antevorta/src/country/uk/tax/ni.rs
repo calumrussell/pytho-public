@@ -1,7 +1,7 @@
 use alator::types::CashValue;
 use serde::{Deserialize, Serialize};
 
-use super::{TaxPeriod, UKTaxConfig};
+use super::{UKTaxConfig, UKTaxInput};
 use crate::tax::ThresholdCalculator;
 
 pub struct NIB1;
@@ -103,7 +103,7 @@ fn ni_calc(nic: &NIC, inc: &f64, is_paye: bool, config: &UKTaxConfig) -> CashVal
 }
 
 impl NIC {
-    pub fn calc(&self, period: &TaxPeriod, config: &UKTaxConfig) -> NITaxOutput {
+    pub fn calc(&self, period: &UKTaxInput, config: &UKTaxConfig) -> NITaxOutput {
         let employment_income = period.employment();
         let ni = ni_calc(self, &employment_income, false, config);
         NITaxOutput(ni)
