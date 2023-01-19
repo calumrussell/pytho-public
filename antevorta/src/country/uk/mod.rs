@@ -2,8 +2,8 @@ pub mod flow;
 mod stack;
 mod tax;
 
-pub use self::tax::NIC;
 use self::tax::UKTaxInput;
+pub use self::tax::NIC;
 
 use alator::types::DateTime;
 use serde::{Deserialize, Serialize};
@@ -78,35 +78,35 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
     pub income_paid_in_curr_loop: CashValue,
-    pub gross_income_annual_sum: CashValue,
-    pub net_income_annual_sum: CashValue,
-    pub expense_annual_sum: CashValue,
-    pub tax_paid_annual_sum: CashValue,
-    pub income_annual_tax:CashValue,
-    pub paye_income_annual_tax: CashValue,
-    pub paye_paid_annual_tax: CashValue,
-    pub savings_income_annual_tax: CashValue,
-    pub rental_income_annual_tax: CashValue,
-    pub self_employment_income_annual_tax: CashValue,
-    pub contributions_annual_tax: CashValue,
+    pub gross_income_annual: CashValue,
+    pub net_income_annual: CashValue,
+    pub expense_annual: CashValue,
+    pub tax_paid_annual: CashValue,
+    pub tax_paid_paye_annual: CashValue,
+    pub non_paye_income_annual: CashValue,
+    pub paye_income_annual: CashValue,
+    pub savings_income_annual: CashValue,
+    pub rental_income_annual: CashValue,
+    pub self_employment_income_annual: CashValue,
+    pub contributions_annual: CashValue,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
     pub fn clear_annual(&mut self) {
-        self.gross_income_annual_sum = CashValue::from(0.0);
-        self.net_income_annual_sum = CashValue::from(0.0);
-        self.expense_annual_sum = CashValue::from(0.0);
-        self.tax_paid_annual_sum = CashValue::from(0.0);
+        self.gross_income_annual = CashValue::from(0.0);
+        self.net_income_annual = CashValue::from(0.0);
+        self.expense_annual = CashValue::from(0.0);
+        self.tax_paid_annual = CashValue::from(0.0);
     }
-    
+
     pub fn clear_tax(&mut self) {
-        self.income_annual_tax = CashValue::from(0.0);
-        self.paye_income_annual_tax = CashValue::from(0.0);
-        self.paye_paid_annual_tax = CashValue::from(0.0);
-        self.savings_income_annual_tax = CashValue::from(0.0);
-        self.rental_income_annual_tax = CashValue::from(0.0);
-        self.self_employment_income_annual_tax = CashValue::from(0.0);
-        self.contributions_annual_tax = CashValue::from(0.0);
+        self.non_paye_income_annual = CashValue::from(0.0);
+        self.paye_income_annual = CashValue::from(0.0);
+        self.savings_income_annual = CashValue::from(0.0);
+        self.rental_income_annual = CashValue::from(0.0);
+        self.self_employment_income_annual = CashValue::from(0.0);
+        self.contributions_annual = CashValue::from(0.0);
+        self.tax_paid_paye_annual = CashValue::from(0.0);
     }
 
     pub fn clear_loop(&mut self) {
@@ -169,10 +169,10 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 gia: self.gia.liquidation_value(),
                 sipp: self.sipp.liquidation_value(),
                 cash: self.bank.balance.clone(),
-                gross_income: self.gross_income_annual_sum.clone(),
-                net_income: self.net_income_annual_sum.clone(),
-                expense: self.expense_annual_sum.clone(),
-                tax_paid: self.tax_paid_annual_sum.clone(),
+                gross_income: self.gross_income_annual.clone(),
+                net_income: self.net_income_annual.clone(),
+                expense: self.expense_annual.clone(),
+                tax_paid: self.tax_paid_annual.clone(),
             };
             self.clear_annual();
             return Some(report);
@@ -213,18 +213,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             }
 
             let input = UKTaxInput {
-                non_paye_employment: self.income_annual_tax.clone(),
-                paye_employment: self.paye_income_annual_tax.clone(),
-                paye_tax_paid: self.paye_paid_annual_tax.clone(),
-                rental: self.rental_income_annual_tax.clone(),
-                savings: self.savings_income_annual_tax.clone(),
-                self_employment: self.self_employment_income_annual_tax.clone(),
+                non_paye_employment: self.non_paye_income_annual.clone(),
+                paye_employment: self.paye_income_annual.clone(),
+                rental: self.rental_income_annual.clone(),
+                savings: self.savings_income_annual.clone(),
+                self_employment: self.self_employment_income_annual.clone(),
                 ni: self.nic_group,
-                contributions: self.contributions_annual_tax.clone(),
+                paye_tax_paid: self.tax_paid_paye_annual.clone(),
+                contributions: self.contributions_annual.clone(),
                 capital_gains: capital_gains.into(),
                 dividend: dividends_received.into(),
             };
-            
+
             let output = TaxPeriod::calc(&input, &self.tax_config);
             let tax_due = output.total();
             if let TransferResult::Failure = self.bank.withdraw(&tax_due) {
@@ -242,16 +242,16 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.bank.zero();
                 } else if *self.isa.liquidation_value() > *tax_due {
                     self.isa.liquidate(&tax_due);
-                    self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
+                    self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 } else {
                     let isa_value = self.isa.liquidation_value();
                     self.isa.liquidate(&isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.gia.liquidate(&remainder);
-                    self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
+                    self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 }
             } else {
-                self.tax_paid_annual_sum = self.tax_paid_annual_sum.clone() + tax_due;
+                self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
             }
             self.clear_tax();
         }
@@ -346,17 +346,17 @@ impl Config {
             tax_config: UKTaxConfig::default(),
             sim_state: SimState::Ready,
             income_paid_in_curr_loop: 0.0.into(),
-            expense_annual_sum: 0.0.into(),
-            gross_income_annual_sum: 0.0.into(),
-            net_income_annual_sum: 0.0.into(),
-            tax_paid_annual_sum: 0.0.into(),
-            contributions_annual_tax: 0.0.into(),
-            income_annual_tax: 0.0.into(),
-            paye_income_annual_tax: 0.0.into(),
-            paye_paid_annual_tax: 0.0.into(),
-            rental_income_annual_tax: 0.0.into(),
-            savings_income_annual_tax: 0.0.into(),
-            self_employment_income_annual_tax: 0.0.into(),
+            expense_annual: 0.0.into(),
+            gross_income_annual: 0.0.into(),
+            net_income_annual: 0.0.into(),
+            tax_paid_annual: 0.0.into(),
+            tax_paid_paye_annual: 0.0.into(),
+            contributions_annual: 0.0.into(),
+            non_paye_income_annual: 0.0.into(),
+            paye_income_annual: 0.0.into(),
+            rental_income_annual: 0.0.into(),
+            savings_income_annual: 0.0.into(),
+            self_employment_income_annual: 0.0.into(),
         }
     }
 

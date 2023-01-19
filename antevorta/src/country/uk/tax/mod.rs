@@ -43,10 +43,6 @@ pub struct UKTaxInput {
 }
 
 impl UKTaxInput {
-    pub fn employment(&self) -> CashValue {
-        self.non_paye_employment.clone() + self.paye_employment.clone()
-    }
-
     pub fn default() -> Self {
         Self {
             non_paye_employment: CashValue::from(0.0),
@@ -214,7 +210,7 @@ impl UKTaxConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{TaxPeriod, UKTaxConfig, NIC, UKTaxInput};
+    use super::{TaxPeriod, UKTaxConfig, UKTaxInput, NIC};
 
     #[test]
     fn test_that_uk_tax_flow_works() {
@@ -248,7 +244,7 @@ mod tests {
         input.non_paye_employment = 70_000.0.into();
         input.dividend = 10_000.0.into();
         let tax_paid = TaxPeriod::calc(&input, &config).total();
- 
+
         //Should be within a few percent of normal income tax rate for income above
         //basic rate
         let mut input1 = UKTaxInput::default();

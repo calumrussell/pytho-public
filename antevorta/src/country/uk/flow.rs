@@ -150,17 +150,21 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.income_annual_tax = state.income_annual_tax.clone() + self.value.clone();
+            //Non-paye employment income deducts contributions but doesn't take income tax or NI
+            //until annual tax date
+            state.non_paye_income_annual =
+                state.non_paye_income_annual.clone() + self.value.clone();
 
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.contributions_annual_tax = state.contributions_annual_tax.clone() + contributed.clone();
+            state.contributions_annual = state.contributions_annual.clone() + contributed.clone();
             let net_pay = *self.value - *contributed + *remainder;
             state.bank.deposit(&net_pay);
 
-            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
-            state.net_income_annual_sum = state.net_income_annual_sum.clone() + net_pay.into();
-            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + net_pay.into();
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.net_income_annual = state.net_income_annual.clone() + net_pay.into();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -204,30 +208,32 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-
+            //Have to deduct income tax and NI and SIPP contributions
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.contributions_annual_tax = state.contributions_annual_tax.clone() + contributed.clone();
+            state.contributions_annual = state.contributions_annual.clone() + contributed.clone();
 
+            //Takes both income tax and NI
             let paye_paid = TaxPeriod::paye(
                 &self.value,
                 &contributed,
                 state.nic_group,
                 &state.tax_config,
             );
+            state.tax_paid_annual = state.tax_paid_annual.clone() + paye_paid.total();
+            state.tax_paid_paye_annual = state.tax_paid_paye_annual.clone() + paye_paid.total();
+
             //We don't deduct paye paid from bank but deduct it straight from gross_pay
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
             state.bank.deposit(&net_pay);
 
-            state.paye_income_annual_tax = state.paye_income_annual_tax.clone() + net_pay.into();
-            state.paye_paid_annual_tax = state.paye_paid_annual_tax.clone() + paye_paid.total();
-            //We have to do this twice because this counter is used for reporting
-            //TODO: integrate the reporting with tax calculations add paye_paid to the reporting
-            state.tax_paid_annual_sum = state.tax_paid_annual_sum.clone() + paye_paid.total();
+            state.paye_income_annual = state.paye_income_annual.clone() + net_pay.into();
+            state.tax_paid_annual = state.tax_paid_annual.clone() + paye_paid.total();
 
-            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
-            state.net_income_annual_sum = state.net_income_annual_sum.clone() + net_pay.into();
-            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + net_pay.into();
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.net_income_annual = state.net_income_annual.clone() + net_pay.into();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -271,11 +277,12 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.rental_income_annual_tax = state.rental_income_annual_tax.clone() + self.value.clone();
+            state.rental_income_annual = state.rental_income_annual.clone() + self.value.clone();
             state.bank.deposit(&self.value);
 
-            state.gross_income_annual_sum = state.gross_income_annual_sum.clone() + self.value.clone();
-            state.income_paid_in_curr_loop = state.income_paid_in_curr_loop.clone() + self.value.clone();
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + self.value.clone();
         }
     }
 
@@ -307,7 +314,7 @@ pub struct Expense {
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.expense_annual_sum = state.expense_annual_sum.clone() + self.value.clone().into();
+            state.expense_annual = state.expense_annual.clone() + self.value.clone().into();
             state.bank.withdraw(&self.value);
         }
     }
@@ -359,7 +366,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
                 let expense_value = self.pct * *state.income_paid_in_curr_loop;
-                state.expense_annual_sum = state.expense_annual_sum.clone() + expense_value.into();
+                state.expense_annual = state.expense_annual.clone() + expense_value.into();
                 state.bank.withdraw(&expense_value);
             }
         }
@@ -383,4 +390,3 @@ impl PctOfIncomeExpense {
         Flow::PctOfIncomeExpense(Self::new(pct, schedule))
     }
 }
-

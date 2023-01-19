@@ -104,7 +104,8 @@ fn ni_calc(nic: &NIC, inc: &f64, is_paye: bool, config: &UKTaxConfig) -> CashVal
 
 impl NIC {
     pub fn calc(&self, period: &UKTaxInput, config: &UKTaxConfig) -> NITaxOutput {
-        let employment_income = period.employment();
+        //We only take non_paye_employment income here because paye_employment has already paid NI
+        let employment_income = &period.non_paye_employment;
         let ni = ni_calc(self, &employment_income, false, config);
         NITaxOutput(ni)
     }
