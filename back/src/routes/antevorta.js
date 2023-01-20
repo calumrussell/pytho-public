@@ -109,6 +109,18 @@ const responseSchema = {
                             type: 'number',
                         },
                     },
+                    contribution_avg: {
+                        type: 'array',
+                        items: {
+                            type: 'number',
+                        },
+                    },
+                    expense_avg: {
+                        type: 'array',
+                        items: {
+                            type: 'number',
+                        },
+                    },
                 },
             }
         },

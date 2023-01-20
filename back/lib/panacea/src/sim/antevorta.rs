@@ -5,9 +5,8 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::country::uk::Config;
+use antevorta::country::uk::{Config, UKAnnualReport};
 use antevorta::input::FakeHashMapSourceSimWithQuotes;
-use antevorta::report::UKAnnualReport;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
@@ -99,6 +98,8 @@ pub struct AntevortaResults {
     pub tax_paid_avg: Vec<f64>,
     pub gross_income_avg: Vec<f64>,
     pub net_income_avg: Vec<f64>,
+    pub contribution_avg: Vec<f64>,
+    pub expense_avg: Vec<f64>,
 }
 
 pub fn antevorta_multiple(
@@ -165,10 +166,9 @@ pub fn antevorta_multiple(
 
         while clock.borrow().has_next() {
             clock.borrow_mut().tick();
-            sim.update();
-            if let Some(annual_perf) = sim.get_annual_report() {
+            if let Some(report) = sim.update() {
                 let curr = annual_perfs.get_mut(i as usize).unwrap();
-                curr.push(annual_perf);
+                curr.push(report);
             }
         }
         total_end_value.push(*sim.get_state().total_value())
@@ -178,11 +178,15 @@ pub fn antevorta_multiple(
     let mut tax_paid_avg = Vec::new();
     let mut gross_income_avg = Vec::new();
     let mut net_income_avg = Vec::new();
+    let mut contribution_avg = Vec::new();
+    let mut expense_avg = Vec::new();
     for i in 0..input.sim_length {
         let mut total_value = Vec::new();
         let mut tax_paid = Vec::new();
         let mut gross_income = Vec::new();
         let mut net_income = Vec::new();
+        let mut contribution = Vec::new();
+        let mut expense = Vec::new();
 
         for j in 0..input.runs {
             let tmp_perf = annual_perfs
@@ -197,11 +201,15 @@ pub fn antevorta_multiple(
             tax_paid.push(*(tmp_perf.tax_paid));
             gross_income.push(*(tmp_perf.gross_income));
             net_income.push(*(tmp_perf.net_income));
+            contribution.push(*(tmp_perf.contributions));
+            expense.push(*(tmp_perf.expense));
         }
         total_value_avg.push(total_value.sum() / total_value.len() as f64);
         tax_paid_avg.push(tax_paid.sum() / tax_paid.len() as f64);
         gross_income_avg.push(gross_income.sum() / gross_income.len() as f64);
         net_income_avg.push(net_income.sum() / net_income.len() as f64);
+        contribution_avg.push(contribution.sum() / contribution.len() as f64);
+        expense_avg.push(expense.sum() / expense.len() as f64);
     }
 
     Ok(AntevortaResults {
@@ -210,6 +218,8 @@ pub fn antevorta_multiple(
         net_income_avg,
         tax_paid_avg,
         total_value_avg,
+        contribution_avg,
+        expense_avg,
     })
 }
 
