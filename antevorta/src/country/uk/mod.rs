@@ -37,6 +37,7 @@ pub struct UKAnnualReport {
     pub net_income: CashValue,
     pub expense: CashValue,
     pub tax_paid: CashValue,
+    pub contributions: CashValue,
 }
 
 pub struct UKStack {
@@ -93,27 +94,27 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
     pub fn clear_annual(&mut self) {
-        self.gross_income_annual = CashValue::from(0.0);
-        self.net_income_annual = CashValue::from(0.0);
-        self.expense_annual = CashValue::from(0.0);
-        self.tax_paid_annual = CashValue::from(0.0);
-    }
-
-    pub fn clear_tax(&mut self) {
-        self.non_paye_income_annual = CashValue::from(0.0);
-        self.paye_income_annual = CashValue::from(0.0);
-        self.savings_income_annual = CashValue::from(0.0);
-        self.rental_income_annual = CashValue::from(0.0);
-        self.self_employment_income_annual = CashValue::from(0.0);
-        self.contributions_annual = CashValue::from(0.0);
-        self.tax_paid_paye_annual = CashValue::from(0.0);
+        let curr_date = self.clock.borrow().now();
+        if self.annual_tax_schedule.check(&curr_date) {
+            self.gross_income_annual = CashValue::from(0.0);
+            self.net_income_annual = CashValue::from(0.0);
+            self.expense_annual = CashValue::from(0.0);
+            self.tax_paid_annual = CashValue::from(0.0);
+            self.non_paye_income_annual = CashValue::from(0.0);
+            self.paye_income_annual = CashValue::from(0.0);
+            self.savings_income_annual = CashValue::from(0.0);
+            self.rental_income_annual = CashValue::from(0.0);
+            self.self_employment_income_annual = CashValue::from(0.0);
+            self.contributions_annual = CashValue::from(0.0);
+            self.tax_paid_paye_annual = CashValue::from(0.0);
+        }
     }
 
     pub fn clear_loop(&mut self) {
         self.income_paid_in_curr_loop = CashValue::from(0.0);
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> Option<UKAnnualReport> {
         match self.sim_state {
             SimState::Ready => {
                 self.clear_loop();
@@ -146,9 +147,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.isa.finish();
                 self.gia.finish();
                 self.sipp.finish();
+
+                if let Some(report) = self.get_annual_report() {
+                    self.clear_annual();
+                    Some(report)
+                } else {
+                    None
+                }
             }
             //If unrecoverable then no further updates
-            SimState::Unrecoverable => {}
+            SimState::Unrecoverable => {
+                None
+            }
         }
     }
 
@@ -173,6 +183,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 net_income: self.net_income_annual.clone(),
                 expense: self.expense_annual.clone(),
                 tax_paid: self.tax_paid_annual.clone(),
+                contributions: self.contributions_annual.clone(),
             };
             self.clear_annual();
             return Some(report);
@@ -253,7 +264,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             } else {
                 self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
             }
-            self.clear_tax();
         }
     }
 }
