@@ -17,13 +17,16 @@ export const init = ({
     invariants: {
       ref,
       colours: [
-        "#222222",
-        "#474747",
-        "#686868",
-        "#878787",
-        "#a7a7a7",
-        "#c6c6c6",
-        "#dedede",
+        "#4e79a7",
+        "#f28e2c",
+        "#e15759",
+        "#76b7b2",
+        "#59a14f",
+        "#edc949",
+        "#af7aa1",
+        "#ff9da7",
+        "#9c755f",
+        "#bab0ab"
       ],
       root: rootId,
       rootWrapper: `${rootId}-bar-wrapper`,

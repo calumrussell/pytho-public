@@ -172,8 +172,7 @@ export const writeStackedRect = (chartState, axis) => {
     },
   } = chartState;
 
-  const translateFunc = (d) =>
-    `translate(0, -2)`;
+  console.log(yValues);
 
   select(`#${rootWrapper}`)
       .append('g')
@@ -186,7 +185,6 @@ export const writeStackedRect = (chartState, axis) => {
       .data((d) => d)
       .join('rect')
       .attr('class', 'chart-bar')
-      .attr('transform', translateFunc)
       .attr('x', (d, i) => x(xGetter(xValues[i])))
       .attr('y', (d) => Math.min(y(d[0]), y(d[1])))
       .attr('width', x.bandwidth())

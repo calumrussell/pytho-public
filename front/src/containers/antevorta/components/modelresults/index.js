@@ -42,15 +42,18 @@ export const ModelResults = (props) => {
       runs,
       gross_income_avg,
       tax_paid_avg,
+      contribution_avg,
+      expense_avg,
       total_end_value,
     } = state.results;
 
     const avg = total_end_value.reduce((acc, curr) => acc+curr, 0) / total_end_value.length;
 
     const years = Array.from(Array(gross_income_avg.length).keys())
-    const after_tax_avg = zip(gross_income_avg, tax_paid_avg)
-      .map(v => v[0] - v[1]);
-    const data = years.map(i => ({income_after_tax: after_tax_avg[i], tax_paid: tax_paid_avg[i] }));
+    const after_tax_avg = zip(gross_income_avg, tax_paid_avg, contribution_avg, expense_avg)
+      .map(v => v[0] - v[1] - v[2] - v[3]);
+    const data = years.map(i => 
+      ({net_income: after_tax_avg[i], taxes_paid: tax_paid_avg[i], contributions: contribution_avg[i], expenses: expense_avg[i] }));
 
     return (
       <ComponentWrapper>
@@ -67,9 +70,9 @@ export const ModelResults = (props) => {
             values={ total_end_value } />
         </DefaultHorizontalSpacer>
         <DefaultHorizontalSpacer>
-          <Text light>Income allocation each simulation year</Text>
+          <Text light>Gross income compositions per simulation year</Text>
           <StackedBarChart
-            labels={ ['income_after_tax', 'tax_paid'] }
+            labels={ ['net_income', 'taxes_paid', 'contributions', 'expenses'] }
             xValues={ years }
             rootId={ 'chart-container-gross-income' }
             yValues={ data } />
