@@ -26,7 +26,7 @@ pub enum Flow {
     EmploymentPAYEFixedGrowth(FixedGrowth, EmploymentPAYE),
     Rental(Rental),
     Expense(Expense),
-    InflationLinkedExpense(InflationDataHashMap, Expense),
+    InflationLinkedExpense(InflationLinkedGrowth, Expense),
     PctOfIncomeExpense(PctOfIncomeExpense),
 }
 
@@ -45,6 +45,9 @@ impl Flow {
         curr: &DateTime,
         state: &mut UKSimulationState<S>,
     ) {
+        //Sometimes the check call will be made to the underlying object. If the data references
+        //some additional data, i.e. inflation, then the call is made to the growth object instead
+        //which modifies the value
         match self {
             Flow::Employment(val) => val.check(curr, state),
             Flow::EmploymentFixedGrowth(growth, val) => growth.check(curr, state, val),
@@ -61,11 +64,11 @@ impl Flow {
 }
 
 #[derive(Clone, Debug)]
-pub struct InflationDataHashMap {
+pub struct InflationLinkedGrowth {
     source: HashMapSourceSim,
 }
 
-impl InflationDataHashMap {
+impl InflationLinkedGrowth {
     fn check<F: WillFlow<S>, S: InvestmentStrategy>(
         &mut self,
         curr: &i64,
@@ -83,7 +86,7 @@ impl InflationDataHashMap {
     }
 }
 
-impl InflationDataHashMap {
+impl InflationLinkedGrowth {
     fn new(source: HashMapSourceSim) -> Self {
         Self { source }
     }
@@ -339,7 +342,7 @@ impl Expense {
         source: HashMapSourceSim,
     ) -> Flow {
         let expense = Expense::new(value, schedule);
-        let data = InflationDataHashMap::new(source);
+        let data = InflationLinkedGrowth::new(source);
         Flow::InflationLinkedExpense(data, expense)
     }
 

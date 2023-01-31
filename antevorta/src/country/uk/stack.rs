@@ -597,12 +597,11 @@ impl<T: SimDataSource> Mortgage<T> {
 mod tests {
 
     use alator::broker::{Trade, TradeType};
+    use alator::clock::ClockBuilder;
     use alator::types::Frequency;
-    use alator::{clock::ClockBuilder, types::DateTime};
-    use std::collections::HashMap;
     use std::rc::Rc;
 
-    use crate::input::{FakeRatesDataGenerator, HashMapSourceSimBuilder};
+    use crate::input::{monthly_data_generator_static, HashMapSourceSimBuilder};
 
     use super::{calculate_capital_gains, isa_deposit_logic, sipp_deposit_logic};
     use super::{BankAcc, LoanEvent, Mortgage};
@@ -690,11 +689,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let mut rates: HashMap<DateTime, f64> = HashMap::new();
-        let mut rate_getter = FakeRatesDataGenerator::get();
-        for date in clock.borrow().peek() {
-            rates.insert(date, rate_getter());
-        }
+        let rates = monthly_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)
@@ -721,11 +716,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let mut rates: HashMap<DateTime, f64> = HashMap::new();
-        let mut rate_getter = FakeRatesDataGenerator::get();
-        for date in clock.borrow().peek() {
-            rates.insert(date, rate_getter());
-        }
+        let rates = monthly_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)

@@ -156,9 +156,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 }
             }
             //If unrecoverable then no further updates
-            SimState::Unrecoverable => {
-                None
-            }
+            SimState::Unrecoverable => None,
         }
     }
 

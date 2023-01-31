@@ -172,20 +172,9 @@ impl FakeHashMapSourceSim {
         let mut rng = thread_rng();
         let dist = Normal::new(0.0, 0.015).unwrap();
 
-        let mut inflation: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            inflation.insert(date, 0.0);
-        }
-
-        let mut rates: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            rates.insert(date, 0.0);
-        }
-
-        let mut house_price_rets: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            house_price_rets.insert(date, 0.0);
-        }
+        let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
+        let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
+        let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
 
         let mut fake_data: QuotesHashMap = HashMap::new();
         let mut price_abc = 100.0;
@@ -216,20 +205,9 @@ pub struct FakeHashMapSourceSimWithQuotes;
 
 impl FakeHashMapSourceSimWithQuotes {
     pub fn get(clock: Clock, quotes: QuotesHashMap) -> HashMapSourceSim {
-        let mut inflation: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            inflation.insert(date, 0.0);
-        }
-
-        let mut rates: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            rates.insert(date, 0.0);
-        }
-
-        let mut house_price_rets: SimDataRep = HashMap::new();
-        for date in clock.borrow().peek() {
-            house_price_rets.insert(date, 0.0);
-        }
+        let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
+        let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
+        let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
 
         HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
@@ -241,13 +219,65 @@ impl FakeHashMapSourceSimWithQuotes {
     }
 }
 
-pub struct FakeRatesDataGenerator;
+pub fn monthly_data_generator_static(mu_annual: f64, clock: Clock) -> SimDataRep {
+    let mut res = HashMap::new();
 
-impl FakeRatesDataGenerator {
-    pub fn get() -> impl FnMut() -> f64 {
-        let mut rng = thread_rng();
-        let dist = Normal::new(0.02, 0.1).unwrap();
-
-        move || dist.sample(&mut rng)
+    let mu_monthly: f64;
+    if mu_annual == 0.0 {
+        mu_monthly = 0.0
+    } else {
+        mu_monthly = mu_annual / 12.0;
     }
+
+    //Because the source can only be called monthly, we can set the same value for all entries.
+    //When it is called, the flow will increment but it won't keep incrementing until the next
+    //call.
+    for date in clock.borrow().peek() {
+        res.insert(date, mu_monthly);
+    }
+    res
+}
+
+pub fn monthly_data_generator_parametric_normal(
+    mu_annual: f64,
+    var_annual: f64,
+    clock: Clock,
+) -> SimDataRep {
+    let mut res = HashMap::new();
+
+    let mu_monthly: f64;
+    if mu_annual == 0.0 {
+        mu_monthly = 0.0
+    } else {
+        mu_monthly = mu_annual / 12.0;
+    }
+    let var_monthly = var_annual / 12.0_f64.sqrt();
+
+    let mut rng = thread_rng();
+    let dist = Normal::new(mu_monthly, var_monthly).unwrap();
+
+    //Date is set for the whole of the month, the expectation is that clients will only call once a
+    //month to update their value for inflation.
+    let mut month = 0;
+    let mut val = dist.sample(&mut rng);
+    for date in clock.borrow().peek() {
+        //Should only occur on first iteration
+        if month.eq(&0) {
+            month = date.month().into();
+            res.insert(date, val);
+            continue;
+        }
+
+        let curr_month: u8 = date.month().into();
+        if curr_month == month {
+            res.insert(date, val);
+        } else {
+            //We only update on the first day of the new month, for every day of that new month we
+            //reuse the value generated here
+            month = date.month().into();
+            val = dist.sample(&mut rng);
+            res.insert(date, val);
+        }
+    }
+    res
 }
