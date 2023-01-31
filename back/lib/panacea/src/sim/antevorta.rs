@@ -6,7 +6,7 @@ use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::country::uk::{Config, UKAnnualReport};
-use antevorta::input::FakeHashMapSourceSimWithQuotes;
+use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
@@ -16,54 +16,34 @@ use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct EodRawAntevortaInput {
-    pub assets: Vec<String>,
-    pub close: Vec<Vec<EodRow>>,
-    pub weights: HashMap<String, f64>,
-    pub sim_length: i64,
-    pub runs: i64,
-    pub config: String,
-}
-
-impl EodRawAntevortaInput {
-    fn build_map(&self, intersection: &Vec<String>) -> AntevortaPriceInput {
-        let mut res = AntevortaPriceInput::new();
-        for (ticker, prices) in self.assets.iter().zip(&self.close) {
-            for row in prices {
-                if intersection.contains(&row.date) {
-                    let ticker_str = ticker.to_string();
-                    if res.contains_key(&ticker_str) {
-                        let curr = res.get_mut(&ticker_str).unwrap();
-                        curr.push(row.adjusted_close);
-                    } else {
-                        let prices = vec![row.adjusted_close];
-                        res.insert(ticker_str, prices);
-                    }
+pub fn build_price_input_from_raw_close_prices(
+    close: &Vec<Vec<EodRow>>,
+    assets: &Vec<String>,
+    date_intersection: &Vec<String>,
+) -> AntevortaPriceInput {
+    let mut res = AntevortaPriceInput::new();
+    for (ticker, prices) in assets.iter().zip(close) {
+        for row in prices {
+            if date_intersection.contains(&row.date) {
+                let ticker_str = ticker.to_string();
+                if res.contains_key(&ticker_str) {
+                    let curr = res.get_mut(&ticker_str).unwrap();
+                    curr.push(row.adjusted_close);
+                } else {
+                    let prices = vec![row.adjusted_close];
+                    res.insert(ticker_str, prices);
                 }
             }
         }
-        res
     }
+    res
 }
 
-impl From<EodRawAntevortaInput> for AntevortaMultipleInput {
-    fn from(value: EodRawAntevortaInput) -> Self {
-        let dates = EodRawCommon::dates_intersect(&value.close);
-        let mut epoch_dates = EodRawCommon::convert_dates_to_epoch(&dates);
-        epoch_dates.sort();
-        let close = value.build_map(&dates);
-
-        Self {
-            weights: value.weights,
-            close,
-            dates: epoch_dates,
-            assets: value.assets,
-            sim_length: value.sim_length,
-            runs: value.runs,
-            config: value.config,
-        }
-    }
+pub fn build_dates_from_raw_close_prices(close: &Vec<Vec<EodRow>>) -> (Vec<String>, Vec<i64>) {
+    let dates = EodRawCommon::dates_intersect(close);
+    let mut epoch_dates = EodRawCommon::convert_dates_to_epoch(&dates);
+    epoch_dates.sort();
+    (dates, epoch_dates)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -80,15 +60,16 @@ impl Error for AntevortaInsufficientDataError {}
 pub type AntevortaPriceInput = HashMap<String, Vec<f64>>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct AntevortaMultipleInput {
+pub struct EodRawAntevortaInput {
     pub assets: Vec<String>,
+    pub close: Vec<Vec<EodRow>>,
     pub weights: HashMap<String, f64>,
-    pub dates: Vec<i64>,
-    pub close: AntevortaPriceInput,
     pub sim_length: i64,
     pub runs: i64,
-    //We wait to convert to SimulationState until we are inside the creation loop
+    //JSON, have to convert far down
     pub config: String,
+    pub inflation_mu: f64,
+    pub inflation_var: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -102,9 +83,11 @@ pub struct AntevortaResults {
     pub expense_avg: Vec<f64>,
 }
 
-pub fn antevorta_multiple(
-    input: AntevortaMultipleInput,
-) -> Result<AntevortaResults, Box<dyn Error>> {
+pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResults, Box<dyn Error>> {
+    //Intersection of overlapping dates
+    let (string_dates, epoch_dates) = build_dates_from_raw_close_prices(&input.close);
+    let close = build_price_input_from_raw_close_prices(&input.close, &input.assets, &string_dates);
+
     let mut total_end_value = Vec::new();
 
     let mut annual_perfs: Vec<Vec<UKAnnualReport>> = Vec::with_capacity(input.runs as usize);
@@ -113,7 +96,7 @@ pub fn antevorta_multiple(
     }
 
     for i in 0..input.runs {
-        let start_date = input.dates.first().unwrap().clone();
+        let start_date = epoch_dates.first().unwrap().clone();
         let sim_length = (input.sim_length * 365) as i64;
 
         let clock = ClockBuilder::with_length_in_days(start_date, sim_length - 1)
@@ -121,7 +104,7 @@ pub fn antevorta_multiple(
             .build();
 
         let mut raw_data: HashMap<DateTime, Vec<Quote>> = HashMap::new();
-        if let Some(resampled_close) = build_sample_raw_daily(sim_length, input.close.clone()) {
+        if let Some(resampled_close) = build_sample_raw_daily(sim_length, close.clone()) {
             //The simulator builds its own dates to use an input
             //This will iterate over the prices within the resampled_close, therefore the vectors have to
             //be equal to sim_length_days
@@ -141,7 +124,12 @@ pub fn antevorta_multiple(
             return Err(Box::new(AntevortaInsufficientDataError));
         }
 
-        let src = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), raw_data);
+        let src = build_hashmapsource_with_quotes_with_inflation(
+            Rc::clone(&clock),
+            raw_data,
+            input.inflation_mu,
+            input.inflation_var,
+        );
 
         let mut weights = PortfolioAllocation::new();
         for symbol in input.weights.keys() {
@@ -229,9 +217,14 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
-    use crate::eod::EodRow;
+    use crate::{
+        eod::EodRow,
+        sim::antevorta::{
+            build_dates_from_raw_close_prices, build_price_input_from_raw_close_prices,
+        },
+    };
 
-    use super::{antevorta_multiple, AntevortaMultipleInput, EodRawAntevortaInput};
+    use super::{antevorta_multiple, EodRawAntevortaInput};
 
     #[derive(Deserialize, Serialize)]
     struct TestEodInput {
@@ -286,6 +279,8 @@ mod tests {
             runs: 2,
             sim_length: 2,
             weights,
+            inflation_mu: 0.02,
+            inflation_var: 0.01,
         }
     }
 
@@ -348,18 +343,25 @@ mod tests {
             runs: 0,
             sim_length: 0,
             weights: HashMap::new(),
+            inflation_mu: 0.02,
+            inflation_var: 0.01,
         };
 
-        let antevorta: AntevortaMultipleInput = input.into();
+        //This function is called at the start of simulation run to find date intersection
+        let (dates_string, epoch_dates) = build_dates_from_raw_close_prices(&input.close);
+        //This function is called at the start of simulation run to build internal prices input
+        let close =
+            build_price_input_from_raw_close_prices(&input.close, &input.assets, &dates_string);
+
         //Queries the length of the price series which should be the length of bcd
-        assert_eq!(antevorta.close.get("101").unwrap().len(), 2);
+        assert_eq!(close.get("101").unwrap().len(), 2);
         //Asserts that the length of the prices series are equal
         assert_eq!(
-            antevorta.close.get("101").unwrap().len(),
-            antevorta.close.get("102").unwrap().len()
+            close.get("101").unwrap().len(),
+            close.get("102").unwrap().len()
         );
         //Asserts date conversion
-        assert_eq!(antevorta.dates, vec![1633165200, 1633251600]);
+        assert_eq!(epoch_dates, vec![1633165200, 1633251600]);
     }
 
     #[test]
