@@ -165,58 +165,27 @@ impl HashMapSourceSimBuilder {
     }
 }
 
-pub struct FakeHashMapSourceSim;
+pub fn build_hashmapsource_with_quotes_with_inflation(
+    clock: Clock,
+    quotes: QuotesHashMap,
+    annual_inflation_mu: f64,
+    annual_inflation_var: f64,
+) -> HashMapSourceSim {
+    let inflation = monthly_data_generator_parametric_normal(
+        annual_inflation_mu,
+        annual_inflation_var,
+        Rc::clone(&clock),
+    );
+    let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
+    let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
 
-impl FakeHashMapSourceSim {
-    pub fn get(clock: Clock) -> HashMapSourceSim {
-        let mut rng = thread_rng();
-        let dist = Normal::new(0.0, 0.015).unwrap();
-
-        let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
-        let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
-        let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
-
-        let mut fake_data: QuotesHashMap = HashMap::new();
-        let mut price_abc = 100.0;
-        let mut price_bcd = 100.0;
-        for date in clock.borrow().peek() {
-            let q_abc = Quote::new(price_abc, price_abc, date.clone(), "ABC");
-            let q_bcd = Quote::new(price_bcd, price_bcd, date.clone(), "BCD");
-            fake_data.insert(date, vec![q_abc, q_bcd]);
-
-            let pct_return_abc = dist.sample(&mut rng);
-            let pct_return_bcd = dist.sample(&mut rng);
-
-            price_abc *= 1.0 + pct_return_abc;
-            price_bcd *= 1.0 + pct_return_bcd;
-        }
-
-        HashMapSourceSimBuilder::start()
-            .with_clock(Rc::clone(&clock))
-            .with_rates(rates)
-            .with_inflation(inflation)
-            .with_house_prices(house_price_rets)
-            .with_quotes(fake_data)
-            .build()
-    }
-}
-
-pub struct FakeHashMapSourceSimWithQuotes;
-
-impl FakeHashMapSourceSimWithQuotes {
-    pub fn get(clock: Clock, quotes: QuotesHashMap) -> HashMapSourceSim {
-        let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
-        let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
-        let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
-
-        HashMapSourceSimBuilder::start()
-            .with_clock(Rc::clone(&clock))
-            .with_rates(rates)
-            .with_inflation(inflation)
-            .with_house_prices(house_price_rets)
-            .with_quotes(quotes)
-            .build()
-    }
+    HashMapSourceSimBuilder::start()
+        .with_clock(Rc::clone(&clock))
+        .with_rates(rates)
+        .with_inflation(inflation)
+        .with_house_prices(house_price_rets)
+        .with_quotes(quotes)
+        .build()
 }
 
 pub fn monthly_data_generator_static(mu_annual: f64, clock: Clock) -> SimDataRep {
@@ -280,4 +249,36 @@ pub fn monthly_data_generator_parametric_normal(
         }
     }
     res
+}
+
+pub fn build_hashmapsource_random(clock: Clock) -> HashMapSourceSim {
+    let mut rng = thread_rng();
+    let dist = Normal::new(0.0, 0.015).unwrap();
+
+    let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
+    let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
+    let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
+
+    let mut fake_data: QuotesHashMap = HashMap::new();
+    let mut price_abc = 100.0;
+    let mut price_bcd = 100.0;
+    for date in clock.borrow().peek() {
+        let q_abc = Quote::new(price_abc, price_abc, date.clone(), "ABC");
+        let q_bcd = Quote::new(price_bcd, price_bcd, date.clone(), "BCD");
+        fake_data.insert(date, vec![q_abc, q_bcd]);
+
+        let pct_return_abc = dist.sample(&mut rng);
+        let pct_return_bcd = dist.sample(&mut rng);
+
+        price_abc *= 1.0 + pct_return_abc;
+        price_bcd *= 1.0 + pct_return_bcd;
+    }
+
+    HashMapSourceSimBuilder::start()
+        .with_clock(Rc::clone(&clock))
+        .with_rates(rates)
+        .with_inflation(inflation)
+        .with_house_prices(house_price_rets)
+        .with_quotes(fake_data)
+        .build()
 }

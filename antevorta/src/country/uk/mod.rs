@@ -133,7 +133,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.sipp.rebalance();
 
                 //We cannot pass the reference to self to flows whilst iterating over flows which are also
-               //on self, we therefore need to clone
+                //on self, we therefore need to clone
                 let mut cloned_flows: Vec<Flow> = self.flows.to_vec();
                 for flow in cloned_flows.iter_mut() {
                     flow.check(&curr_date, self);
@@ -156,9 +156,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 }
             }
             //If unrecoverable then no further updates
-            SimState::Unrecoverable => {
-                None
-            }
+            SimState::Unrecoverable => None,
         }
     }
 

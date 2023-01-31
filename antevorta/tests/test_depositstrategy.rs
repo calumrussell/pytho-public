@@ -4,7 +4,7 @@ use alator::exchange::DefaultExchangeBuilder;
 use alator::input::QuotesHashMap;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::input::FakeHashMapSourceSimWithQuotes;
+use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -38,7 +38,8 @@ fn sim_depositstrategy() {
         );
     }
 
-    let src = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), fake_data);
+    let src =
+        build_hashmapsource_with_quotes_with_inflation(Rc::clone(&clock), fake_data, 0.0, 0.0);
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 1.0);

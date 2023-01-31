@@ -7,7 +7,7 @@ a complete config.
 
 use alator::exchange::DefaultExchangeBuilder;
 use antevorta::country::uk::Config;
-use antevorta::input::{FakeHashMapSourceSimWithQuotes, HashMapSourceSim};
+use antevorta::input::{build_hashmapsource_with_quotes_with_inflation, HashMapSourceSim};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use std::collections::HashMap;
@@ -40,19 +40,20 @@ fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
         price_bcd *= 1.0 + ret_dist.sample(&mut rng);
     }
 
-    let sim_data = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), fake_data);
+    let src =
+        build_hashmapsource_with_quotes_with_inflation(Rc::clone(&clock), fake_data, 0.0, 0.0);
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 0.5);
     target_weights.insert("BCD", 0.5);
 
     let exchange = DefaultExchangeBuilder::new()
-        .with_data_source(sim_data.clone())
+        .with_data_source(src.clone())
         .with_clock(Rc::clone(&clock))
         .build();
 
     let brkr = SimulatedBrokerBuilder::new()
-        .with_data(sim_data.clone())
+        .with_data(src.clone())
         .with_exchange(exchange)
         .build();
 
@@ -62,7 +63,7 @@ fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
         target_weights,
         Rc::clone(&clock),
     );
-    (clock, strat, sim_data)
+    (clock, strat, src)
 }
 
 #[test]

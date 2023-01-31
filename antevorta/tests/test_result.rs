@@ -2,7 +2,7 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
-use antevorta::input::FakeHashMapSourceSim;
+use antevorta::input::build_hashmapsource_random;
 use std::rc::Rc;
 
 use antevorta::country::uk::Config;
@@ -16,8 +16,7 @@ fn sim_result_test() {
     let clock = ClockBuilder::with_length_in_days(1, 365 * 2)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
-
-    let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
+    let src = build_hashmapsource_random(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 1.0);

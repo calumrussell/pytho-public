@@ -158,7 +158,7 @@ impl Employment {
     pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
         let income = Employment::new(value, schedule);
         let data = InflationLinkedGrowth::new(source);
-        Flow::Employment(data, income) 
+        Flow::Employment(data, income)
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
@@ -223,7 +223,7 @@ impl EmploymentPAYE {
     pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
         let income = EmploymentPAYE::new(value, schedule);
         let data = InflationLinkedGrowth::new(source);
-        Flow::EmploymentPAYE(data, income) 
+        Flow::EmploymentPAYE(data, income)
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
