@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
@@ -16,14 +14,15 @@ trait WillFlow<S: InvestmentStrategy> {
     fn set_value(&mut self, cash: &f64);
 }
 
+//Default growth is inflation-linked. This type of growth assumes that the polling frequency for
+//changes to the flow state is monthly. If it is more than this, the value will be updated too
+//often.
 #[derive(Clone, Debug)]
 pub enum Flow {
-    Employment(Employment),
+    Employment(InflationLinkedGrowth, Employment),
     EmploymentStaticGrowth(StaticGrowth, Employment),
-    EmploymentFixedGrowth(FixedGrowth, Employment),
-    EmploymentPAYE(EmploymentPAYE),
+    EmploymentPAYE(InflationLinkedGrowth, EmploymentPAYE),
     EmploymentPAYEStaticGrowth(StaticGrowth, EmploymentPAYE),
-    EmploymentPAYEFixedGrowth(FixedGrowth, EmploymentPAYE),
     Rental(Rental),
     Expense(Expense),
     InflationLinkedExpense(InflationLinkedGrowth, Expense),
@@ -49,11 +48,9 @@ impl Flow {
         //some additional data, i.e. inflation, then the call is made to the growth object instead
         //which modifies the value
         match self {
-            Flow::Employment(val) => val.check(curr, state),
-            Flow::EmploymentFixedGrowth(growth, val) => growth.check(curr, state, val),
+            Flow::Employment(growth, val) => growth.check(curr, state, val),
             Flow::EmploymentStaticGrowth(growth, val) => growth.check(curr, state, val),
-            Flow::EmploymentPAYE(val) => val.check(curr, state),
-            Flow::EmploymentPAYEFixedGrowth(growth, val) => growth.check(curr, state, val),
+            Flow::EmploymentPAYE(growth, val) => growth.check(curr, state, val),
             Flow::EmploymentPAYEStaticGrowth(growth, val) => growth.check(curr, state, val),
             Flow::Rental(val) => val.check(curr, state),
             Flow::Expense(val) => val.check(curr, state),
@@ -115,35 +112,6 @@ impl StaticGrowth {
     }
 }
 
-type FixedGrowthData = HashMap<DateTime, f64>;
-
-#[derive(Clone, Debug)]
-pub struct FixedGrowth {
-    growth_data: FixedGrowthData,
-}
-
-impl FixedGrowth {
-    fn check<F: WillFlow<S>, S: InvestmentStrategy>(
-        &mut self,
-        curr: &i64,
-        state: &mut UKSimulationState<S>,
-        target: &mut F,
-    ) {
-        target.check(curr, state);
-        let curr_val = target.get_value();
-        if let Some(growth) = self.growth_data.get(&DateTime::from(*curr)) {
-            let new_val = *curr_val * (1.0 + growth);
-            target.set_value(&new_val)
-        } else {
-            panic!("Created fixed growth rate employement income with bad date");
-        }
-    }
-
-    fn new(growth_data: FixedGrowthData) -> Self {
-        Self { growth_data }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Employment {
     value: CashValue,
@@ -187,14 +155,10 @@ impl Employment {
         Flow::EmploymentStaticGrowth(growth, employment)
     }
 
-    pub fn fixed_growth(value: CashValue, schedule: Schedule, growth: FixedGrowthData) -> Flow {
-        let growth = FixedGrowth::new(growth);
-        let employment = Employment::new(value, schedule);
-        Flow::EmploymentFixedGrowth(growth, employment)
-    }
-
-    pub fn flow(value: CashValue, schedule: Schedule) -> Flow {
-        Flow::Employment(Self::new(value, schedule))
+    pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
+        let income = Employment::new(value, schedule);
+        let data = InflationLinkedGrowth::new(source);
+        Flow::Employment(data, income) 
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
@@ -256,14 +220,10 @@ impl EmploymentPAYE {
         Flow::EmploymentPAYEStaticGrowth(growth, employment)
     }
 
-    pub fn fixed_growth(value: CashValue, schedule: Schedule, growth: FixedGrowthData) -> Flow {
-        let growth = FixedGrowth::new(growth);
-        let employment = EmploymentPAYE::new(value, schedule);
-        Flow::EmploymentPAYEFixedGrowth(growth, employment)
-    }
-
-    pub fn flow(value: CashValue, schedule: Schedule) -> Flow {
-        Flow::EmploymentPAYE(Self::new(value, schedule))
+    pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
+        let income = EmploymentPAYE::new(value, schedule);
+        let data = InflationLinkedGrowth::new(source);
+        Flow::EmploymentPAYE(data, income) 
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
