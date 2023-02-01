@@ -176,6 +176,7 @@ pub fn build_hashmapsource_with_quotes_with_inflation(
         annual_inflation_var,
         Rc::clone(&clock),
     );
+
     let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
     let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
 

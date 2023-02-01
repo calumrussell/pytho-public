@@ -63,6 +63,7 @@ impl Flow {
 #[derive(Clone, Debug)]
 pub struct InflationLinkedGrowth {
     source: HashMapSourceSim,
+    schedule: Schedule,
 }
 
 impl InflationLinkedGrowth {
@@ -73,19 +74,21 @@ impl InflationLinkedGrowth {
         target: &mut F,
     ) {
         target.check(curr, state);
-        let curr_val = target.get_value();
-        if let Some(inflation) = self.source.get_current_inflation() {
-            let new_val = *curr_val * (1.0 + inflation);
-            target.set_value(&new_val);
-        } else {
-            panic!("Created fixed growth rate employement income with bad date");
+        if self.schedule.check(curr) {
+            let curr_val = target.get_value();
+            if let Some(inflation) = self.source.get_current_inflation() {
+                let new_val = *curr_val * (1.0 + inflation);
+                target.set_value(&new_val);
+            } else {
+                panic!("Created fixed growth rate employement income with bad date");
+            }
         }
     }
 }
 
 impl InflationLinkedGrowth {
-    fn new(source: HashMapSourceSim) -> Self {
-        Self { source }
+    fn new(source: HashMapSourceSim, schedule: Schedule) -> Self {
+        Self { source, schedule }
     }
 }
 
@@ -156,8 +159,8 @@ impl Employment {
     }
 
     pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
-        let income = Employment::new(value, schedule);
-        let data = InflationLinkedGrowth::new(source);
+        let income = Employment::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
         Flow::Employment(data, income)
     }
 
@@ -221,8 +224,8 @@ impl EmploymentPAYE {
     }
 
     pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
-        let income = EmploymentPAYE::new(value, schedule);
-        let data = InflationLinkedGrowth::new(source);
+        let income = EmploymentPAYE::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
         Flow::EmploymentPAYE(data, income)
     }
 
@@ -301,8 +304,8 @@ impl Expense {
         schedule: Schedule,
         source: HashMapSourceSim,
     ) -> Flow {
-        let expense = Expense::new(value, schedule);
-        let data = InflationLinkedGrowth::new(source);
+        let expense = Expense::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
         Flow::InflationLinkedExpense(data, expense)
     }
 
