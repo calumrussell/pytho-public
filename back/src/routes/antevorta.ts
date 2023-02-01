@@ -11,6 +11,8 @@ interface AntevortaInput {
   sim_length: number,
   runs: number,
   config: string,
+  inflation_mu: number,
+  inflation_var: number,
 }
 
 interface AntevortaRequestBody {
@@ -19,12 +21,13 @@ interface AntevortaRequestBody {
   sim_length: number,
   runs: number,
   sim_config: string,
+  inflation_mu: number,
+  inflation_var: number,
 };
 
 type AntevortaRequest = FastifyRequest<{
   Body: AntevortaRequestBody,
 }>;
-
 
 export const handler = (fastify: FastifyInstance) => async (request: AntevortaRequest, reply: FastifyReply) => {
   const {
@@ -33,6 +36,8 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
     sim_length,
     runs,
     sim_config,
+    inflation_mu,
+    inflation_var,
   } = request.body;
   
   try {
@@ -58,6 +63,8 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
       sim_length,
       runs,
       config: sim_config,
+      inflation_mu,
+      inflation_var,
     };
 
     let res = { data: antevorta(input) };
@@ -99,6 +106,12 @@ const bodySchema = {
     sim_config: {
       type: 'string',
     },
+    inflation_mu: {
+      type: 'number',
+    },
+    inflation_var: {
+      type: 'number',
+    }
   },
 };
 

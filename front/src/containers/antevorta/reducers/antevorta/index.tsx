@@ -6,12 +6,15 @@ import {
 import { FinancialPlan, PlanStack, StackType } from '@Components/reducers/fplan';
 import { AxiosError } from 'axios';
 
+//This uses the same variable names as the backend so some variabls are snakecase
 export interface SimRequestInput {
   runs: number,
   sim_config: FinancialPlan,
   sim_length: number,
   assets: Array<number>,
   weights: Array<number>
+  inflation_mu: number,
+  inflation_var: number,
 }
 
 // Before we send this to server, we perform some error-checking. This is

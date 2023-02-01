@@ -57,6 +57,8 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
 
     const [runs, setRuns] = useState(5);
     const [simLength, setSimLength] = useState(5);
+    const [inflationMu, setInflationMu] = useState(2);
+    const [inflationVar, setInflationVar] = useState(2);
     const [disabledState, setDisabledState] = useState(false);
 
     const {
@@ -81,16 +83,19 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
 
     const PortfolioDisplay = displayPortfolio();
 
-    const runnerInput = {
-      sim_config: planState.plans[selectedPlanPos].plan,
-      runs,
-      sim_length: simLength,
-      ...jsonPortfolio(),
-    };
-
     const clickButton = (
       ev: React.MouseEvent<HTMLButtonElement>) => {
         ev.preventDefault();
+
+        const runnerInput = {
+          sim_config: planState.plans[selectedPlanPos].plan,
+          runs,
+          sim_length: simLength,
+          inflation_mu: inflationMu / 100.0,
+          inflation_var: inflationVar / 100.0,
+          ...jsonPortfolio(),
+        };
+
         setDisabledState(true);
         const stop = toggleLoader();
 
@@ -142,6 +147,36 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
                 onChange={ 
                   (ev: React.ChangeEvent<HTMLInputElement>) => 
                     inputWrapper(ev, setRuns) } />
+              <FormLabel
+                htmlFor="antevorta-inflationmu-input">
+                <Text light>Annual inflation average</Text>
+              </FormLabel>
+              <FormInput
+                id="antevorta-inflationmu-input"
+                type="number"
+                min="-10"
+                max="10"
+                step="0.5"
+                value={ inflationMu }
+                name="inflationMu"
+                onChange={ 
+                  (ev: React.ChangeEvent<HTMLInputElement>) => 
+                    inputWrapper(ev, setInflationMu ) } />
+               <FormLabel
+                htmlFor="antevorta-inflationvar-input">
+                <Text light>Annual inflation variance</Text>
+              </FormLabel>
+              <FormInput
+                id="antevorta-inflationvar-input"
+                type="number"
+                min="-10"
+                max="10"
+                step="0.5"
+                value={ inflationVar }
+                name="inflationVar"
+                onChange={ 
+                  (ev: React.ChangeEvent<HTMLInputElement>) => 
+                    inputWrapper(ev, setInflationVar) } />
             </FormWrapper>
           </DefaultHorizontalSpacer>
           <Title>Build Portfolio</Title>
