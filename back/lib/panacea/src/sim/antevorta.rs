@@ -189,7 +189,7 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
             tax_paid.push(*(tmp_perf.tax_paid));
             gross_income.push(*(tmp_perf.gross_income));
             net_income.push(*(tmp_perf.net_income));
-            contribution.push(*(tmp_perf.contributions));
+            contribution.push(*(tmp_perf.sipp_contributions));
             expense.push(*(tmp_perf.expense));
         }
         total_value_avg.push(total_value.sum() / total_value.len() as f64);
@@ -280,7 +280,7 @@ mod tests {
             sim_length: 2,
             weights,
             inflation_mu: 0.02,
-            inflation_var: 0.01,
+            inflation_var: 0.001,
         }
     }
 
