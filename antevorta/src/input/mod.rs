@@ -10,11 +10,18 @@ use alator::{
 };
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
+use time::OffsetDateTime;
 
 type SimDataRep = HashMap<DateTime, f64>;
 
+//Data layout always has daily frequency but the series below typically occur at a higher
+//frequency. In order to keep these at a daily frequency we downsample them and expect them to
+//increment on a daily frequency, even in flows which typically only activate per month.
+//This is a convoluted way of doing this but it reduces the chances of causing an error by keeping
+//all the sources of data at the same frequency.
 pub trait SimDataSource: Clone + DataSource {
     fn get_current_inflation(&self) -> Option<f64>;
+    fn get_trailing_year_inflation(&self) -> Option<f64>;
     fn get_current_interest_rate(&self) -> Option<f64>;
     fn get_current_house_price_return(&self) -> Option<f64>;
 }
@@ -38,6 +45,23 @@ impl SimDataSource for HashMapSourceSim {
     fn get_current_house_price_return(&self) -> Option<f64> {
         let now = self.inner.borrow().clock.borrow().now();
         self.inner.borrow().house_price_rets.get(&now).copied()
+    }
+
+    fn get_trailing_year_inflation(&self) -> Option<f64> {
+        let now = self.inner.borrow().clock.borrow().now();
+        let now_offset: OffsetDateTime = now.clone().into();
+        let last_year = now_offset.replace_year(now_offset.year() - 1).unwrap();
+        let last_year_internal: DateTime = last_year.into();
+
+        let mut tmp = 1.0;
+        for date in self.inner.borrow().clock.borrow().peek() {
+            if date > last_year_internal && date < now {
+                //peek returns values that definitely exist so we can unwrap safely
+                let val = self.inner.borrow().inflation.get(&now).unwrap().clone();
+                tmp *= 1.0 + val;
+            }
+        }
+        Some((tmp / 1.0) - 1.0)
     }
 
     fn get_current_inflation(&self) -> Option<f64> {
@@ -171,14 +195,14 @@ pub fn build_hashmapsource_with_quotes_with_inflation(
     annual_inflation_mu: f64,
     annual_inflation_var: f64,
 ) -> HashMapSourceSim {
-    let inflation = monthly_data_generator_parametric_normal(
+    let inflation = daily_data_generator_parametric_normal(
         annual_inflation_mu,
         annual_inflation_var,
         Rc::clone(&clock),
     );
 
-    let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
-    let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
+    let rates = daily_data_generator_static(0.0, Rc::clone(&clock));
+    let house_price_rets = daily_data_generator_static(0.0, Rc::clone(&clock));
 
     HashMapSourceSimBuilder::start()
         .with_clock(Rc::clone(&clock))
@@ -189,65 +213,59 @@ pub fn build_hashmapsource_with_quotes_with_inflation(
         .build()
 }
 
-pub fn monthly_data_generator_static(mu_annual: f64, clock: Clock) -> SimDataRep {
+pub fn daily_data_generator_static(mu_annual: f64, clock: Clock) -> SimDataRep {
+    //Inflation data is received at an annual frequency, and then is reduced down to a compounded
+    //daily equivalent. This calculates inflation over all days including weekends. This will very
+    //slightly understate inflation due to leap years but this approach is used to keep all data
+    //sources on the same frequency.
+
     let mut res = HashMap::new();
 
-    let mu_monthly: f64;
+    let mu_daily: f64;
     if mu_annual == 0.0 {
-        mu_monthly = 0.0
+        mu_daily = 0.0
     } else {
-        mu_monthly = mu_annual / 12.0;
+        mu_daily = ((1.0 + mu_annual).powf(1.0 / 365.0)) - 1.0;
     }
 
-    //Because the source can only be called monthly, we can set the same value for all entries.
-    //When it is called, the flow will increment but it won't keep incrementing until the next
-    //call.
+    //Sets value on every day using daily-compounded growth
     for date in clock.borrow().peek() {
-        res.insert(date, mu_monthly);
+        res.insert(date, mu_daily);
     }
     res
 }
 
-pub fn monthly_data_generator_parametric_normal(
+pub fn daily_data_generator_parametric_normal(
     mu_annual: f64,
     var_annual: f64,
     clock: Clock,
 ) -> SimDataRep {
+    //Inflation data is received at an annual frequency, and then is reduced down to a compounded
+    //daily equivalent. This calculates inflation over all days including weekends. This will very
+    //slightly understate inflation due to leap years but this approach is used to keep all data
+    //sources on the same frequency.
     let mut res = HashMap::new();
 
-    let mu_monthly: f64;
+    let mu_daily: f64;
     if mu_annual == 0.0 {
-        mu_monthly = 0.0
+        mu_daily = 0.0
     } else {
-        mu_monthly = mu_annual / 12.0;
+        mu_daily = ((1.0 + mu_annual).powf(1.0 / 365.0)) - 1.0;
     }
-    let var_monthly = var_annual / 12.0_f64.sqrt();
+
+    if var_annual == 0.0 {
+        return daily_data_generator_static(mu_annual, clock);
+    }
+
+    let var_daily = var_annual / 365.0_f64.sqrt();
 
     let mut rng = thread_rng();
-    let dist = Normal::new(mu_monthly, var_monthly).unwrap();
+    let dist = Normal::new(mu_daily, var_daily).unwrap();
 
-    //Date is set for the whole of the month, the expectation is that clients will only call once a
-    //month to update their value for inflation.
-    let mut month = 0;
-    let mut val = dist.sample(&mut rng);
+    //Sets value on every day using daily-compounded growth
     for date in clock.borrow().peek() {
-        //Should only occur on first iteration
-        if month.eq(&0) {
-            month = date.month().into();
-            res.insert(date, val);
-            continue;
-        }
-
-        let curr_month: u8 = date.month().into();
-        if curr_month == month {
-            res.insert(date, val);
-        } else {
-            //We only update on the first day of the new month, for every day of that new month we
-            //reuse the value generated here
-            month = date.month().into();
-            val = dist.sample(&mut rng);
-            res.insert(date, val);
-        }
+        let val = dist.sample(&mut rng);
+        res.insert(date, val);
     }
     res
 }
@@ -256,9 +274,9 @@ pub fn build_hashmapsource_random(clock: Clock) -> HashMapSourceSim {
     let mut rng = thread_rng();
     let dist = Normal::new(0.0, 0.015).unwrap();
 
-    let inflation = monthly_data_generator_static(0.0, Rc::clone(&clock));
-    let rates = monthly_data_generator_static(0.0, Rc::clone(&clock));
-    let house_price_rets = monthly_data_generator_static(0.0, Rc::clone(&clock));
+    let inflation = daily_data_generator_static(0.0, Rc::clone(&clock));
+    let rates = daily_data_generator_static(0.0, Rc::clone(&clock));
+    let house_price_rets = daily_data_generator_static(0.0, Rc::clone(&clock));
 
     let mut fake_data: QuotesHashMap = HashMap::new();
     let mut price_abc = 100.0;

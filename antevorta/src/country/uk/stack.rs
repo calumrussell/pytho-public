@@ -601,7 +601,7 @@ mod tests {
     use alator::types::Frequency;
     use std::rc::Rc;
 
-    use crate::input::{monthly_data_generator_static, HashMapSourceSimBuilder};
+    use crate::input::{daily_data_generator_static, HashMapSourceSimBuilder};
 
     use super::{calculate_capital_gains, isa_deposit_logic, sipp_deposit_logic};
     use super::{BankAcc, LoanEvent, Mortgage};
@@ -689,7 +689,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let rates = monthly_data_generator_static(0.02, Rc::clone(&clock));
+        let rates = daily_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)
@@ -716,7 +716,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let rates = monthly_data_generator_static(0.02, Rc::clone(&clock));
+        let rates = daily_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)

@@ -37,7 +37,16 @@ pub struct UKAnnualReport {
     pub net_income: CashValue,
     pub expense: CashValue,
     pub tax_paid: CashValue,
-    pub contributions: CashValue,
+    pub sipp_contributions: CashValue,
+    pub paid_into_isa: CashValue,
+    pub paid_into_gia: CashValue,
+    pub inflation: f64,
+    pub isa_return_nominal: f64,
+    pub isa_return_real: f64,
+    pub gia_return_nominal: f64,
+    pub gia_return_real: f64,
+    pub sipp_return_nominal: f64,
+    pub sipp_return_real: f64,
 }
 
 pub struct UKStack {
@@ -89,7 +98,10 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub savings_income_annual: CashValue,
     pub rental_income_annual: CashValue,
     pub self_employment_income_annual: CashValue,
-    pub contributions_annual: CashValue,
+    pub sipp_contributions_annual: CashValue,
+    pub paid_into_isa_annual: CashValue,
+    pub paid_into_gia_annual: CashValue,
+    pub trailing_annual_report: Option<UKAnnualReport>,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
@@ -105,8 +117,10 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             self.savings_income_annual = CashValue::from(0.0);
             self.rental_income_annual = CashValue::from(0.0);
             self.self_employment_income_annual = CashValue::from(0.0);
-            self.contributions_annual = CashValue::from(0.0);
+            self.sipp_contributions_annual = CashValue::from(0.0);
             self.tax_paid_paye_annual = CashValue::from(0.0);
+            self.paid_into_isa_annual = CashValue::from(0.0);
+            self.paid_into_gia_annual = CashValue::from(0.0);
         }
     }
 
@@ -172,6 +186,91 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
         let curr_date = self.clock.borrow().now();
         if self.annual_tax_schedule.check(&curr_date) {
+            let past_year_inflation = self.source.get_trailing_year_inflation().unwrap();
+            let (isa_return, gia_return, sipp_return) = match &self.trailing_annual_report {
+                //First year of simulation
+                None => {
+                    let isa_return: f64;
+                    let gia_return: f64;
+                    let sipp_return: f64;
+
+                    if *self.isa.liquidation_value() == 0.0 {
+                        isa_return = 0.0;
+                    } else {
+                        isa_return = (*self.isa.liquidation_value() - (*self.paid_into_isa_annual))
+                            / (*self.paid_into_isa_annual);
+                    }
+
+                    if *self.gia.liquidation_value() == 0.0 {
+                        gia_return = 0.0;
+                    } else {
+                        gia_return = (*self.gia.liquidation_value() - (*self.paid_into_gia_annual))
+                            / (*self.paid_into_gia_annual);
+                    }
+
+                    if *self.sipp.liquidation_value() == 0.0 {
+                        sipp_return = 0.0;
+                    } else {
+                        sipp_return = (*self.sipp.liquidation_value()
+                            - (*self.sipp_contributions_annual))
+                            / (*self.sipp_contributions_annual);
+                    }
+                    (isa_return, gia_return, sipp_return)
+                }
+                Some(last_report) => {
+                    let isa_return: f64;
+                    let gia_return: f64;
+                    let sipp_return: f64;
+
+                    if *self.isa.liquidation_value() == 0.0 {
+                        isa_return = 0.0;
+                    } else {
+                        isa_return = (*self.isa.liquidation_value()
+                            - (*last_report.isa + *self.paid_into_isa_annual))
+                            / (*last_report.isa + *self.paid_into_isa_annual);
+                    }
+
+                    if *self.gia.liquidation_value() == 0.0 {
+                        gia_return = 0.0;
+                    } else {
+                        gia_return = (*self.gia.liquidation_value()
+                            - (*last_report.gia + *self.paid_into_gia_annual))
+                            / (*last_report.gia + *self.paid_into_gia_annual);
+                    }
+
+                    if *self.sipp.liquidation_value() == 0.0 {
+                        sipp_return = 0.0;
+                    } else {
+                        sipp_return = (*self.sipp.liquidation_value()
+                            - (*last_report.sipp + *self.sipp_contributions_annual))
+                            / (*last_report.sipp + *self.sipp_contributions_annual);
+                    }
+                    (isa_return, gia_return, sipp_return)
+                }
+            };
+
+            let isa_return_real: f64;
+            let gia_return_real: f64;
+            let sipp_return_real: f64;
+
+            if isa_return == 0.0 {
+                isa_return_real = 0.0;
+            } else {
+                isa_return_real = (1.0 + isa_return) / (1.0 + past_year_inflation) - 1.0;
+            }
+
+            if gia_return == 0.0 {
+                gia_return_real = 0.0;
+            } else {
+                gia_return_real = (1.0 + gia_return) / (1.0 + past_year_inflation) - 1.0;
+            }
+
+            if sipp_return == 0.0 {
+                sipp_return_real = 0.0;
+            } else {
+                sipp_return_real = (1.0 + sipp_return) / (1.0 + past_year_inflation) - 1.0;
+            }
+
             let report = UKAnnualReport {
                 isa: self.isa.liquidation_value(),
                 gia: self.gia.liquidation_value(),
@@ -181,8 +280,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 net_income: self.net_income_annual.clone(),
                 expense: self.expense_annual.clone(),
                 tax_paid: self.tax_paid_annual.clone(),
-                contributions: self.contributions_annual.clone(),
+                sipp_contributions: self.sipp_contributions_annual.clone(),
+                paid_into_isa: self.paid_into_isa_annual.clone(),
+                paid_into_gia: self.paid_into_gia_annual.clone(),
+                inflation: past_year_inflation,
+                isa_return_nominal: isa_return,
+                isa_return_real,
+                gia_return_nominal: gia_return,
+                gia_return_real,
+                sipp_return_nominal: sipp_return,
+                sipp_return_real,
             };
+            self.trailing_annual_report = Some(report.clone());
             self.clear_annual();
             return Some(report);
         }
@@ -190,14 +299,20 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     }
 
     fn rebalance_cash(&mut self) {
+        //All flows credit the bank account only, the only place that we make deposits into
+        //non-pension investment accounts is here, and this is where we track those flows.
+        //Only exception to this is when we need to liquidate for tax payments.
         let bank_bal = *self.bank.balance;
         let excess_cash = bank_bal - self.emergency_fund_minimum;
         if excess_cash > 0.0 {
             self.bank.withdraw(&excess_cash);
             //If we are over ISA deposit limit, invest what is possible then return the remainder
             //which can go into GIA
-            let (_deposited, remainder) = self.isa.deposit_wrapper(&excess_cash);
+            let (deposited, remainder) = self.isa.deposit_wrapper(&excess_cash);
+            self.paid_into_isa_annual = CashValue::from(*self.paid_into_isa_annual + *deposited);
             if *remainder > 0.0 {
+                self.paid_into_gia_annual =
+                    CashValue::from(*self.paid_into_gia_annual + *remainder);
                 self.gia.deposit(&remainder);
             }
         }
@@ -229,7 +344,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self_employment: self.self_employment_income_annual.clone(),
                 ni: self.nic_group,
                 paye_tax_paid: self.tax_paid_paye_annual.clone(),
-                contributions: self.contributions_annual.clone(),
+                contributions: self.sipp_contributions_annual.clone(),
                 capital_gains: capital_gains.into(),
                 dividend: dividends_received.into(),
             };
@@ -251,12 +366,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.bank.zero();
                 } else if *self.isa.liquidation_value() > *tax_due {
                     self.isa.liquidate(&tax_due);
+                    self.paid_into_isa_annual =
+                        CashValue::from(*self.paid_into_isa_annual - *tax_due);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 } else {
                     let isa_value = self.isa.liquidation_value();
                     self.isa.liquidate(&isa_value);
+                    self.paid_into_isa_annual =
+                        CashValue::from(*self.paid_into_isa_annual - *isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.gia.liquidate(&remainder);
+                    self.paid_into_gia_annual =
+                        CashValue::from(*self.paid_into_gia_annual - remainder);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 }
             } else {
@@ -359,12 +480,15 @@ impl Config {
             net_income_annual: 0.0.into(),
             tax_paid_annual: 0.0.into(),
             tax_paid_paye_annual: 0.0.into(),
-            contributions_annual: 0.0.into(),
+            sipp_contributions_annual: 0.0.into(),
             non_paye_income_annual: 0.0.into(),
             paye_income_annual: 0.0.into(),
             rental_income_annual: 0.0.into(),
             savings_income_annual: 0.0.into(),
             self_employment_income_annual: 0.0.into(),
+            paid_into_gia_annual: 0.0.into(),
+            paid_into_isa_annual: 0.0.into(),
+            trailing_annual_report: None,
         }
     }
 

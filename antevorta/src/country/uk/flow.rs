@@ -9,6 +9,9 @@ use super::tax::TaxPeriod;
 use super::UKSimulationState;
 
 trait WillFlow<S: InvestmentStrategy> {
+    //Check should only deposit funds into cash. We need to track deposits to other accounts so it
+    //makes sense to only credit investment accounts from one place (when the portfolio is
+    //rebalanced).
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>);
     fn get_value(&self) -> CashValue;
     fn set_value(&mut self, cash: &f64);
@@ -131,7 +134,8 @@ impl<S: InvestmentStrategy> WillFlow<S> for Employment {
 
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.contributions_annual = state.contributions_annual.clone() + contributed.clone();
+            state.sipp_contributions_annual =
+                state.sipp_contributions_annual.clone() + contributed.clone();
             let net_pay = *self.value - *contributed + *remainder;
             state.bank.deposit(&net_pay);
 
@@ -181,7 +185,8 @@ impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
             //Have to deduct income tax and NI and SIPP contributions
             let contribution = *self.value * state.contribution_pct;
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
-            state.contributions_annual = state.contributions_annual.clone() + contributed.clone();
+            state.sipp_contributions_annual =
+                state.sipp_contributions_annual.clone() + contributed.clone();
 
             //Takes both income tax and NI
             let paye_paid = TaxPeriod::paye(
