@@ -78,5 +78,5 @@ fn sim_test() {
         sim.update();
     }
 
-    sim.get_state();
+    sim.get_tracker();
 }

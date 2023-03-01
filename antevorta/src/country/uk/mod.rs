@@ -6,6 +6,7 @@ use self::tax::UKTaxInput;
 pub use self::tax::NIC;
 
 use alator::types::DateTime;
+use alator::types::StrategySnapshot;
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
 use std::rc::Rc;
@@ -27,38 +28,45 @@ use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
 
+///Tracks the performance of values across the simulation on an annual basis. This is meant to
+///integrate into the performance calculation code in alator.
+///Intention is that this data is returned to clients at the end of the simulation.
 #[derive(Clone, Debug)]
-pub struct UKAnnualReport {
-    pub isa: CashValue,
-    pub sipp: CashValue,
-    pub gia: CashValue,
-    pub cash: CashValue,
-    pub gross_income: CashValue,
-    pub net_income: CashValue,
-    pub expense: CashValue,
-    pub tax_paid: CashValue,
-    pub sipp_contributions: CashValue,
-    pub paid_into_isa: CashValue,
-    pub paid_into_gia: CashValue,
-    pub inflation: f64,
-    pub isa_return_nominal: f64,
-    pub isa_return_real: f64,
-    pub gia_return_nominal: f64,
-    pub gia_return_real: f64,
-    pub sipp_return_nominal: f64,
-    pub sipp_return_real: f64,
+pub struct UKSimulationPerformanceTracker {
+    isa_snapshot: Vec<StrategySnapshot>,
+    sipp_snapshot: Vec<StrategySnapshot>,
+    gia_snapshot: Vec<StrategySnapshot>,
+    cash: Vec<CashValue>,
+    gross_income: Vec<CashValue>,
+    net_income: Vec<CashValue>,
+    expense: Vec<CashValue>,
+    tax_paid: Vec<CashValue>,
+    sipp_contributions: Vec<CashValue>,
+    inflation: Vec<f64>,
 }
 
-pub struct UKStack {
-    pub isa: CashValue,
-    pub sipp: CashValue,
-    pub gia: CashValue,
-    pub bank: CashValue,
-}
+impl UKSimulationPerformanceTracker {
+    fn init() -> Self {
+        Self {
+            isa_snapshot: Vec::new(),
+            sipp_snapshot: Vec::new(),
+            gia_snapshot: Vec::new(),
+            cash: Vec::new(),
+            gross_income: Vec::new(),
+            net_income: Vec::new(),
+            expense: Vec::new(),
+            tax_paid: Vec::new(),
+            sipp_contributions: Vec::new(),
+            inflation: Vec::new(),
+        }
+    }
 
-impl UKStack {
-    pub fn total_value(&self) -> CashValue {
-        CashValue::from(*self.isa + *self.sipp + *self.gia + *self.bank)
+    pub fn get_final_value(&self) -> CashValue {
+        let total_value = *self.isa_snapshot.last().unwrap().portfolio_value
+            + *self.gia_snapshot.last().unwrap().portfolio_value
+            + *self.sipp_snapshot.last().unwrap().portfolio_value
+            + **self.cash.last().unwrap();
+        CashValue::from(total_value)
     }
 }
 
@@ -87,6 +95,8 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub isa: Isa<S>,
     pub tax_config: UKTaxConfig,
     pub sim_state: SimState,
+
+    //All of this state is flushed at some point
     pub income_paid_in_curr_loop: CashValue,
     pub gross_income_annual: CashValue,
     pub net_income_annual: CashValue,
@@ -101,11 +111,12 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub sipp_contributions_annual: CashValue,
     pub paid_into_isa_annual: CashValue,
     pub paid_into_gia_annual: CashValue,
-    pub trailing_annual_report: Option<UKAnnualReport>,
+
+    pub tracker: UKSimulationPerformanceTracker,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
-    pub fn clear_annual(&mut self) {
+    fn clear_annual(&mut self) {
         let curr_date = self.clock.borrow().now();
         if self.annual_tax_schedule.check(&curr_date) {
             self.gross_income_annual = CashValue::from(0.0);
@@ -124,11 +135,25 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
         }
     }
 
-    pub fn clear_loop(&mut self) {
+    fn clear_loop(&mut self) {
         self.income_paid_in_curr_loop = CashValue::from(0.0);
     }
 
-    pub fn update(&mut self) -> Option<UKAnnualReport> {
+    ///Only used for integration testing logic for simulation runs that are less than one year long and which,
+    ///as a result, will not have any tracking data to return
+    pub fn get_total_value(&self) -> CashValue {
+        let total_value = *self.isa.liquidation_value()
+            + *self.gia.liquidation_value()
+            + *self.sipp.liquidation_value()
+            + *self.bank.balance;
+        CashValue::from(total_value)
+    }
+
+    pub fn get_tracker(&self) -> UKSimulationPerformanceTracker {
+        self.tracker.clone()
+    }
+
+    pub fn update(&mut self) {
         match self.sim_state {
             SimState::Ready => {
                 self.clear_loop();
@@ -162,140 +187,52 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.gia.finish();
                 self.sipp.finish();
 
-                if let Some(report) = self.get_annual_report() {
-                    self.clear_annual();
-                    Some(report)
-                } else {
-                    None
-                }
+                //This will only trigger at the end of the tax year
+                self.update_tracker();
             }
-            //If unrecoverable then no further updates
-            SimState::Unrecoverable => None,
+            SimState::Unrecoverable => {}
         }
     }
 
-    pub fn get_state(&self) -> UKStack {
-        UKStack {
-            isa: self.isa.liquidation_value(),
-            gia: self.gia.liquidation_value(),
-            sipp: self.sipp.liquidation_value(),
-            bank: self.bank.balance.clone(),
-        }
-    }
-
-    pub fn get_annual_report(&mut self) -> Option<UKAnnualReport> {
+    fn update_tracker(&mut self) {
         let curr_date = self.clock.borrow().now();
+        //Tracker is updated annually on the same schedule as taxation
         if self.annual_tax_schedule.check(&curr_date) {
             let past_year_inflation = self.source.get_trailing_year_inflation().unwrap();
-            let (isa_return, gia_return, sipp_return) = match &self.trailing_annual_report {
-                //First year of simulation
-                None => {
-                    let isa_return: f64;
-                    let gia_return: f64;
-                    let sipp_return: f64;
-
-                    if *self.isa.liquidation_value() == 0.0 {
-                        isa_return = 0.0;
-                    } else {
-                        isa_return = (*self.isa.liquidation_value() - (*self.paid_into_isa_annual))
-                            / (*self.paid_into_isa_annual);
-                    }
-
-                    if *self.gia.liquidation_value() == 0.0 {
-                        gia_return = 0.0;
-                    } else {
-                        gia_return = (*self.gia.liquidation_value() - (*self.paid_into_gia_annual))
-                            / (*self.paid_into_gia_annual);
-                    }
-
-                    if *self.sipp.liquidation_value() == 0.0 {
-                        sipp_return = 0.0;
-                    } else {
-                        sipp_return = (*self.sipp.liquidation_value()
-                            - (*self.sipp_contributions_annual))
-                            / (*self.sipp_contributions_annual);
-                    }
-                    (isa_return, gia_return, sipp_return)
-                }
-                Some(last_report) => {
-                    let isa_return: f64;
-                    let gia_return: f64;
-                    let sipp_return: f64;
-
-                    if *self.isa.liquidation_value() == 0.0 {
-                        isa_return = 0.0;
-                    } else {
-                        isa_return = (*self.isa.liquidation_value()
-                            - (*last_report.isa + *self.paid_into_isa_annual))
-                            / (*last_report.isa + *self.paid_into_isa_annual);
-                    }
-
-                    if *self.gia.liquidation_value() == 0.0 {
-                        gia_return = 0.0;
-                    } else {
-                        gia_return = (*self.gia.liquidation_value()
-                            - (*last_report.gia + *self.paid_into_gia_annual))
-                            / (*last_report.gia + *self.paid_into_gia_annual);
-                    }
-
-                    if *self.sipp.liquidation_value() == 0.0 {
-                        sipp_return = 0.0;
-                    } else {
-                        sipp_return = (*self.sipp.liquidation_value()
-                            - (*last_report.sipp + *self.sipp_contributions_annual))
-                            / (*last_report.sipp + *self.sipp_contributions_annual);
-                    }
-                    (isa_return, gia_return, sipp_return)
-                }
+            let isa_snapshot = StrategySnapshot {
+                date: curr_date.clone(),
+                portfolio_value: self.isa.liquidation_value(),
+                net_cash_flow: self.paid_into_isa_annual.clone(),
+            };
+            let gia_snapshot = StrategySnapshot {
+                date: curr_date.clone(),
+                portfolio_value: self.gia.liquidation_value(),
+                net_cash_flow: self.paid_into_gia_annual.clone(),
+            };
+            let sipp_snapshot = StrategySnapshot {
+                date: curr_date.clone(),
+                portfolio_value: self.sipp.liquidation_value(),
+                net_cash_flow: self.sipp_contributions_annual.clone(),
             };
 
-            let isa_return_real: f64;
-            let gia_return_real: f64;
-            let sipp_return_real: f64;
+            self.tracker.inflation.push(past_year_inflation);
+            self.tracker.isa_snapshot.push(isa_snapshot);
+            self.tracker.gia_snapshot.push(gia_snapshot);
+            self.tracker.sipp_snapshot.push(sipp_snapshot);
+            self.tracker.cash.push(self.bank.balance.clone());
+            self.tracker
+                .gross_income
+                .push(self.gross_income_annual.clone());
+            self.tracker.net_income.push(self.net_income_annual.clone());
+            self.tracker.expense.push(self.expense_annual.clone());
+            self.tracker.tax_paid.push(self.tax_paid_annual.clone());
+            self.tracker
+                .sipp_contributions
+                .push(self.sipp_contributions_annual.clone());
 
-            if isa_return == 0.0 {
-                isa_return_real = 0.0;
-            } else {
-                isa_return_real = (1.0 + isa_return) / (1.0 + past_year_inflation) - 1.0;
-            }
-
-            if gia_return == 0.0 {
-                gia_return_real = 0.0;
-            } else {
-                gia_return_real = (1.0 + gia_return) / (1.0 + past_year_inflation) - 1.0;
-            }
-
-            if sipp_return == 0.0 {
-                sipp_return_real = 0.0;
-            } else {
-                sipp_return_real = (1.0 + sipp_return) / (1.0 + past_year_inflation) - 1.0;
-            }
-
-            let report = UKAnnualReport {
-                isa: self.isa.liquidation_value(),
-                gia: self.gia.liquidation_value(),
-                sipp: self.sipp.liquidation_value(),
-                cash: self.bank.balance.clone(),
-                gross_income: self.gross_income_annual.clone(),
-                net_income: self.net_income_annual.clone(),
-                expense: self.expense_annual.clone(),
-                tax_paid: self.tax_paid_annual.clone(),
-                sipp_contributions: self.sipp_contributions_annual.clone(),
-                paid_into_isa: self.paid_into_isa_annual.clone(),
-                paid_into_gia: self.paid_into_gia_annual.clone(),
-                inflation: past_year_inflation,
-                isa_return_nominal: isa_return,
-                isa_return_real,
-                gia_return_nominal: gia_return,
-                gia_return_real,
-                sipp_return_nominal: sipp_return,
-                sipp_return_real,
-            };
-            self.trailing_annual_report = Some(report.clone());
+            //Resets all the state tracker over the year to zero
             self.clear_annual();
-            return Some(report);
         }
-        None
     }
 
     fn rebalance_cash(&mut self) {
@@ -488,7 +425,7 @@ impl Config {
             self_employment_income_annual: 0.0.into(),
             paid_into_gia_annual: 0.0.into(),
             paid_into_isa_annual: 0.0.into(),
-            trailing_annual_report: None,
+            tracker: UKSimulationPerformanceTracker::init(),
         }
     }
 
