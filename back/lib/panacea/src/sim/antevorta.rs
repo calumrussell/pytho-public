@@ -5,12 +5,11 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::country::uk::{Config, UKAnnualReport};
+use antevorta::country::uk::{Config, UKSimulationPerformanceTracker};
 use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
-use smartcore::linalg::basic::arrays::ArrayView1;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -83,28 +82,75 @@ pub struct AntevortaResults {
     pub expense_avg: Vec<f64>,
 }
 
+fn parse_results(
+    trackers: Vec<UKSimulationPerformanceTracker>,
+    sim_length_in_years: u8,
+) -> AntevortaResults {
+    let mut total_end_value = Vec::new();
+    let mut total_value_avg = Vec::new();
+    let mut tax_paid_avg = Vec::new();
+    let mut gross_income_avg = Vec::new();
+    let mut net_income_avg = Vec::new();
+    let mut contribution_avg = Vec::new();
+    let mut expense_avg = Vec::new();
+
+    for tracker in &trackers {
+        total_end_value.push(*tracker.get_final_value());
+    }
+
+    for year in 0..sim_length_in_years {
+        let mut total_value = Vec::new();
+        let mut tax_paid = Vec::new();
+        let mut gross_income = Vec::new();
+        let mut net_income = Vec::new();
+        let mut contribution = Vec::new();
+        let mut expense = Vec::new();
+
+        for tracker in &trackers {
+            let tracker_year = tracker.get_year(year as usize);
+
+            let value_sum = *tracker_year.isa_snapshot.portfolio_value
+                + *tracker_year.gia_snapshot.portfolio_value
+                + *tracker_year.sipp_snapshot.portfolio_value
+                + *tracker_year.cash;
+
+            total_value.push(value_sum);
+            tax_paid.push(*tracker_year.tax_paid);
+            gross_income.push(*tracker_year.gross_income);
+            net_income.push(*tracker_year.net_income);
+            contribution.push(*tracker_year.sipp_contributions);
+            expense.push(*tracker_year.expense);
+        }
+    }
+
+    AntevortaResults {
+        total_end_value,
+        total_value_avg,
+        tax_paid_avg,
+        gross_income_avg,
+        net_income_avg,
+        contribution_avg,
+        expense_avg,
+    }
+}
+
 pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResults, Box<dyn Error>> {
     //Intersection of overlapping dates
     let (string_dates, epoch_dates) = build_dates_from_raw_close_prices(&input.close);
     let close = build_price_input_from_raw_close_prices(&input.close, &input.assets, &string_dates);
 
-    let mut total_end_value = Vec::new();
-
-    let mut annual_perfs: Vec<Vec<UKAnnualReport>> = Vec::with_capacity(input.runs as usize);
-    for _i in 0..input.runs {
-        annual_perfs.push(vec![]);
-    }
+    let mut results = Vec::new();
 
     for i in 0..input.runs {
         let start_date = epoch_dates.first().unwrap().clone();
-        let sim_length = (input.sim_length * 365) as i64;
+        let sim_length_in_days = (input.sim_length * 365) as i64;
 
-        let clock = ClockBuilder::with_length_in_days(start_date, sim_length - 1)
+        let clock = ClockBuilder::with_length_in_days(start_date, sim_length_in_days - 1)
             .with_frequency(&alator::types::Frequency::Daily)
             .build();
 
         let mut raw_data: HashMap<DateTime, Vec<Quote>> = HashMap::new();
-        if let Some(resampled_close) = build_sample_raw_daily(sim_length, close.clone()) {
+        if let Some(resampled_close) = build_sample_raw_daily(sim_length_in_days, close.clone()) {
             //The simulator builds its own dates to use an input
             //This will iterate over the prices within the resampled_close, therefore the vectors have to
             //be equal to sim_length_days
@@ -153,62 +199,12 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
         let mut sim = config.create(Rc::clone(&clock), strat, src);
 
         while clock.borrow().has_next() {
+            sim.update();
             clock.borrow_mut().tick();
-            if let Some(report) = sim.update() {
-                let curr = annual_perfs.get_mut(i as usize).unwrap();
-                curr.push(report);
-            }
         }
-        total_end_value.push(*sim.get_state().total_value())
+        results.push(sim.get_tracker());
     }
-
-    let mut total_value_avg = Vec::new();
-    let mut tax_paid_avg = Vec::new();
-    let mut gross_income_avg = Vec::new();
-    let mut net_income_avg = Vec::new();
-    let mut contribution_avg = Vec::new();
-    let mut expense_avg = Vec::new();
-    for i in 0..input.sim_length {
-        let mut total_value = Vec::new();
-        let mut tax_paid = Vec::new();
-        let mut gross_income = Vec::new();
-        let mut net_income = Vec::new();
-        let mut contribution = Vec::new();
-        let mut expense = Vec::new();
-
-        for j in 0..input.runs {
-            let tmp_perf = annual_perfs
-                .get(j as usize)
-                .unwrap()
-                .get(i as usize)
-                .unwrap();
-
-            let value_sum = *tmp_perf.isa + *tmp_perf.gia + *tmp_perf.sipp + *tmp_perf.cash;
-
-            total_value.push(value_sum);
-            tax_paid.push(*(tmp_perf.tax_paid));
-            gross_income.push(*(tmp_perf.gross_income));
-            net_income.push(*(tmp_perf.net_income));
-            contribution.push(*(tmp_perf.sipp_contributions));
-            expense.push(*(tmp_perf.expense));
-        }
-        total_value_avg.push(total_value.sum() / total_value.len() as f64);
-        tax_paid_avg.push(tax_paid.sum() / tax_paid.len() as f64);
-        gross_income_avg.push(gross_income.sum() / gross_income.len() as f64);
-        net_income_avg.push(net_income.sum() / net_income.len() as f64);
-        contribution_avg.push(contribution.sum() / contribution.len() as f64);
-        expense_avg.push(expense.sum() / expense.len() as f64);
-    }
-
-    Ok(AntevortaResults {
-        total_end_value,
-        gross_income_avg,
-        net_income_avg,
-        tax_paid_avg,
-        total_value_avg,
-        contribution_avg,
-        expense_avg,
-    })
+    Ok(parse_results(results, input.sim_length as u8))
 }
 
 #[cfg(test)]
