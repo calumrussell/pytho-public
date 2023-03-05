@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
+use smartcore::linalg::basic::arrays::ArrayView1;
 
 pub fn build_price_input_from_raw_close_prices(
     close: &Vec<Vec<EodRow>>,
@@ -121,6 +122,12 @@ fn parse_results(
             contribution.push(*tracker_year.sipp_contributions);
             expense.push(*tracker_year.expense);
         }
+        total_value_avg.push(total_value.sum() / total_value.len() as f64);
+        tax_paid_avg.push(tax_paid.sum() / tax_paid.len() as f64);
+        gross_income_avg.push(gross_income.sum() / gross_income.len() as f64);
+        net_income_avg.push(net_income.sum() / net_income.len() as f64);
+        contribution_avg.push(contribution.sum() / contribution.len() as f64);
+        expense_avg.push(expense.sum() / expense.len() as f64);
     }
 
     AntevortaResults {
