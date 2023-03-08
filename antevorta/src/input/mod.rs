@@ -16,12 +16,18 @@ type SimDataRep = HashMap<DateTime, f64>;
 
 //Data layout always has daily frequency but the series below typically occur at a higher
 //frequency. In order to keep these at a daily frequency we downsample them and expect them to
-//increment on a daily frequency, even in flows which typically only activate per month.
+//increment (and be called) on a daily frequency, even in flows which typically only activate per month.
 //This is a convoluted way of doing this but it reduces the chances of causing an error by keeping
 //all the sources of data at the same frequency.
+//
+//Trailing queries do not return `Option` because they cannot fail. Iteration over `Clock` through peek
+//so if we query a date outside the simulation (for example, calling trailing_year on first day) then
+//a nonsense value (zero) will be silently returned. This makes sense because we cannot generate returns
+//in this period either so we assume the caller knows what it is doing.
 pub trait SimDataSource: Clone + DataSource {
     fn get_current_inflation(&self) -> Option<f64>;
-    fn get_trailing_year_inflation(&self) -> Option<f64>;
+    fn get_trailing_year_inflation(&self) -> f64;
+    fn get_trailing_month_inflation(&self) -> f64;
     fn get_current_interest_rate(&self) -> Option<f64>;
     fn get_current_house_price_return(&self) -> Option<f64>;
 }
@@ -47,7 +53,26 @@ impl SimDataSource for HashMapSourceSim {
         self.inner.borrow().house_price_rets.get(&now).copied()
     }
 
-    fn get_trailing_year_inflation(&self) -> Option<f64> {
+    fn get_trailing_month_inflation(&self) -> f64 {
+        let now = self.inner.borrow().clock.borrow().now();
+        let now_offset: OffsetDateTime = now.clone().into();
+
+        let last_month = now_offset.month().previous();
+        let last_month_offset = now_offset.replace_month(last_month).unwrap();
+        let last_month_internal: DateTime = last_month_offset.into();
+
+        let mut tmp = 1.0;
+        for date in self.inner.borrow().clock.borrow().peek() {
+            if date > last_month_internal && date < now {
+                //peek returns values that definitely exist so we can unwrap safely
+                let val = self.inner.borrow().inflation.get(&now).unwrap().clone();
+                tmp *= 1.0 + val;
+            }
+        }
+        (tmp / 1.0) - 1.0
+    }
+
+    fn get_trailing_year_inflation(&self) -> f64 {
         let now = self.inner.borrow().clock.borrow().now();
         let now_offset: OffsetDateTime = now.clone().into();
         let last_year = now_offset.replace_year(now_offset.year() - 1).unwrap();
@@ -61,7 +86,7 @@ impl SimDataSource for HashMapSourceSim {
                 tmp *= 1.0 + val;
             }
         }
-        Some((tmp / 1.0) - 1.0)
+        (tmp / 1.0) - 1.0
     }
 
     fn get_current_inflation(&self) -> Option<f64> {

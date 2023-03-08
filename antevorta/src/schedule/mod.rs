@@ -13,6 +13,7 @@ pub enum Schedule {
     SpecificEpoch(DateTime),
     EveryYear(Day, Month),
     EveryMonth(Day),
+    StartOfMonth,
     EveryDay,
 }
 
@@ -32,7 +33,7 @@ impl Schedule {
                     let last_year = d.replace_year(d.year() - 1).unwrap();
                     Some(DateTime::from(last_year.unix_timestamp()))
                 }
-                Schedule::EveryMonth(_) => {
+                Schedule::EveryMonth(_) | Schedule::StartOfMonth => {
                     let last_month = d.replace_month(d.month().previous()).unwrap();
                     Some(DateTime::from(last_month.unix_timestamp()))
                 }
@@ -56,6 +57,7 @@ impl Schedule {
                 }
                 Schedule::EveryMonth(day) => d.day() == *day as u8,
                 Schedule::EveryDay => true,
+                Schedule::StartOfMonth => d.date().day() == 1,
             },
             _ => false,
         }

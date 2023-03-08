@@ -5,8 +5,7 @@ mod tax;
 use self::tax::UKTaxInput;
 pub use self::tax::NIC;
 
-use alator::perf::PerformanceCalculator;
-use alator::types::BacktestOutput;
+use alator::perf::{BacktestOutput, PerformanceCalculator};
 use alator::types::DateTime;
 use alator::types::StrategySnapshot;
 use serde::{Deserialize, Serialize};
@@ -44,7 +43,6 @@ pub struct UKSimulationPerformanceTracker {
     expense: Vec<CashValue>,
     tax_paid: Vec<CashValue>,
     sipp_contributions: Vec<CashValue>,
-    inflation: Vec<f64>,
 }
 
 
@@ -60,7 +58,6 @@ impl UKSimulationPerformanceTracker {
             expense: Vec::new(),
             tax_paid: Vec::new(),
             sipp_contributions: Vec::new(),
-            inflation: Vec::new(),
         }
     }
 
@@ -75,15 +72,14 @@ impl UKSimulationPerformanceTracker {
             expense: self.expense.get(idx).unwrap().clone(),
             tax_paid: self.tax_paid.get(idx).unwrap().clone(),
             sipp_contributions: self.sipp_contributions.get(idx).unwrap().clone(),
-            inflation: self.inflation.get(idx).unwrap().clone(),
         }
     }
 
     pub fn get_perf(&self) -> UKSimulationPerformancePortfolioStats {
         UKSimulationPerformancePortfolioStats {
-            isa: PerformanceCalculator::calculate(alator::types::Frequency::Yearly, self.isa_snapshot.clone()),
-            gia: PerformanceCalculator::calculate(alator::types::Frequency::Yearly, self.gia_snapshot.clone()),
-            sipp: PerformanceCalculator::calculate(alator::types::Frequency::Yearly, self.sipp_snapshot.clone()),
+            isa: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.isa_snapshot.clone()),
+            gia: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.gia_snapshot.clone()),
+            sipp: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.sipp_snapshot.clone()),
         }
     }
 
@@ -107,7 +103,6 @@ pub struct UKSimulationPerformanceAnnualFrame {
     pub expense: CashValue,
     pub tax_paid: CashValue,
     pub sipp_contributions: CashValue,
-    pub inflation: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -129,6 +124,7 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     //Has to be ordered, tax has to be calculated first
     pub nic_group: NIC,
     pub annual_tax_schedule: Schedule,
+    pub perf_schedule: Schedule,
     pub clock: Clock,
     pub contribution_pct: f64,
     pub emergency_fund_minimum: f64,
@@ -156,8 +152,12 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub rental_income_annual: CashValue,
     pub self_employment_income_annual: CashValue,
     pub sipp_contributions_annual: CashValue,
-    pub paid_into_isa_annual: CashValue,
-    pub paid_into_gia_annual: CashValue,
+    //Persists over the life of simulation
+    //`StrategySnapshot` diffs the cash values so we have to provide total
+    //sum
+    pub paid_into_isa_since_start: CashValue,
+    pub paid_into_gia_since_start: CashValue,
+    pub paid_into_sipp_since_start: CashValue,
 
     pub tracker: UKSimulationPerformanceTracker,
 }
@@ -177,8 +177,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             self.self_employment_income_annual = CashValue::from(0.0);
             self.sipp_contributions_annual = CashValue::from(0.0);
             self.tax_paid_paye_annual = CashValue::from(0.0);
-            self.paid_into_isa_annual = CashValue::from(0.0);
-            self.paid_into_gia_annual = CashValue::from(0.0);
         }
     }
 
@@ -243,30 +241,37 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
     fn update_tracker(&mut self) {
         let curr_date = self.clock.borrow().now();
-        //Tracker is updated annually on the same schedule as taxation
-        if self.annual_tax_schedule.check(&curr_date) {
-            let past_year_inflation = self.source.get_trailing_year_inflation().unwrap();
+
+        // `StrategySnapshot` for accounts are updated monthly. Annual variables are updated 
+        // annually, and once updated they are cleared.
+        if self.perf_schedule.check(&curr_date) {
+            let trailing_month_inflation = self.source.get_trailing_month_inflation();
+
             let isa_snapshot = StrategySnapshot {
                 date: curr_date.clone(),
                 portfolio_value: self.isa.liquidation_value(),
-                net_cash_flow: self.paid_into_isa_annual.clone(),
+                net_cash_flow: self.paid_into_isa_since_start.clone(),
+                inflation: trailing_month_inflation.clone(),
             };
             let gia_snapshot = StrategySnapshot {
                 date: curr_date.clone(),
                 portfolio_value: self.gia.liquidation_value(),
-                net_cash_flow: self.paid_into_gia_annual.clone(),
+                net_cash_flow: self.paid_into_gia_since_start.clone(),
+                inflation: trailing_month_inflation.clone(),
             };
             let sipp_snapshot = StrategySnapshot {
                 date: curr_date.clone(),
                 portfolio_value: self.sipp.liquidation_value(),
-                net_cash_flow: self.sipp_contributions_annual.clone(),
+                net_cash_flow: self.paid_into_sipp_since_start.clone(),
+                inflation: trailing_month_inflation.clone(),
             };
-
-            self.tracker.inflation.push(past_year_inflation);
             self.tracker.isa_snapshot.push(isa_snapshot);
             self.tracker.gia_snapshot.push(gia_snapshot);
             self.tracker.sipp_snapshot.push(sipp_snapshot);
             self.tracker.cash.push(self.bank.balance.clone());
+        }
+
+        if self.annual_tax_schedule.check(&curr_date) {
             self.tracker
                 .gross_income
                 .push(self.gross_income_annual.clone());
@@ -293,10 +298,10 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             //If we are over ISA deposit limit, invest what is possible then return the remainder
             //which can go into GIA
             let (deposited, remainder) = self.isa.deposit_wrapper(&excess_cash);
-            self.paid_into_isa_annual = CashValue::from(*self.paid_into_isa_annual + *deposited);
+            self.paid_into_isa_since_start = CashValue::from(*self.paid_into_isa_since_start + *deposited);
             if *remainder > 0.0 {
-                self.paid_into_gia_annual =
-                    CashValue::from(*self.paid_into_gia_annual + *remainder);
+                self.paid_into_gia_since_start =
+                    CashValue::from(*self.paid_into_gia_since_start + *remainder);
                 self.gia.deposit(&remainder);
             }
         }
@@ -350,18 +355,18 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.bank.zero();
                 } else if *self.isa.liquidation_value() > *tax_due {
                     self.isa.liquidate(&tax_due);
-                    self.paid_into_isa_annual =
-                        CashValue::from(*self.paid_into_isa_annual - *tax_due);
+                    self.paid_into_isa_since_start =
+                        CashValue::from(*self.paid_into_isa_since_start - *tax_due);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 } else {
                     let isa_value = self.isa.liquidation_value();
                     self.isa.liquidate(&isa_value);
-                    self.paid_into_isa_annual =
-                        CashValue::from(*self.paid_into_isa_annual - *isa_value);
+                    self.paid_into_isa_since_start =
+                        CashValue::from(*self.paid_into_isa_since_start - *isa_value);
                     let remainder = *tax_due - *isa_value;
                     self.gia.liquidate(&remainder);
-                    self.paid_into_gia_annual =
-                        CashValue::from(*self.paid_into_gia_annual - remainder);
+                    self.paid_into_gia_since_start =
+                        CashValue::from(*self.paid_into_gia_since_start - remainder);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
                 }
             } else {
@@ -442,11 +447,10 @@ impl Config {
         flows.append(&mut expense_flows);
         flows.append(&mut non_expense_flows);
 
-        let annual_tax_schedule = Schedule::EveryYear(1, 4);
-
         UKSimulationState {
             nic_group: self.nic,
-            annual_tax_schedule: annual_tax_schedule.clone(),
+            annual_tax_schedule: Schedule::EveryYear(1, 4),
+            perf_schedule: Schedule::StartOfMonth,
             clock: Rc::clone(&clock),
             contribution_pct: self.contribution_pct,
             emergency_fund_minimum: self.emergency_cash_min,
@@ -470,8 +474,9 @@ impl Config {
             rental_income_annual: 0.0.into(),
             savings_income_annual: 0.0.into(),
             self_employment_income_annual: 0.0.into(),
-            paid_into_gia_annual: 0.0.into(),
-            paid_into_isa_annual: 0.0.into(),
+            paid_into_gia_since_start: 0.0.into(),
+            paid_into_isa_since_start: 0.0.into(),
+            paid_into_sipp_since_start: 0.0.into(),
             tracker: UKSimulationPerformanceTracker::init(),
         }
     }

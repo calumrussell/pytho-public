@@ -136,6 +136,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for Employment {
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
             state.sipp_contributions_annual =
                 state.sipp_contributions_annual.clone() + contributed.clone();
+            state.paid_into_sipp_since_start = state.paid_into_sipp_since_start.clone() + contributed.clone();
             let net_pay = *self.value - *contributed + *remainder;
             state.bank.deposit(&net_pay);
 
@@ -187,6 +188,7 @@ impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
             let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
             state.sipp_contributions_annual =
                 state.sipp_contributions_annual.clone() + contributed.clone();
+            state.paid_into_sipp_since_start = state.paid_into_sipp_since_start.clone() + contributed.clone();
 
             //Takes both income tax and NI
             let paye_paid = TaxPeriod::paye(
