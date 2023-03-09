@@ -130,6 +130,11 @@ fn parse_results(
         expense_avg.push(expense.sum() / expense.len() as f64);
     }
 
+    for tracker in &trackers {
+        dbg!(tracker.get_perf().isa.returns, tracker.get_perf().sipp.returns);
+        dbg!(tracker.get_perf().isa.ret, tracker.get_perf().sipp.ret);
+    }
+
     AntevortaResults {
         total_end_value,
         total_value_avg,
@@ -372,5 +377,6 @@ mod tests {
         let antevorta = setup();
         //This is larger dataset, this tests that we load without errors
         let _res = antevorta_multiple(antevorta.into()).unwrap();
+        assert!(true==false);
     }
 }

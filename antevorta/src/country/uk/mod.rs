@@ -208,6 +208,8 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
                 let curr_date = self.clock.borrow().now();
 
+                self.update_tracker();
+
                 self.rebalance_cash();
                 //Only triggers when schedule is met
                 self.pay_taxes(&curr_date);
@@ -233,7 +235,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.sipp.finish();
 
                 //This will only trigger at the end of the tax year
-                self.update_tracker();
+                //self.update_tracker();
             }
             SimState::Unrecoverable => {}
         }
@@ -490,6 +492,7 @@ impl Config {
 enum SupportedSchedules {
     EveryDay,
     EndOfMonth,
+    StartOfMonth,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
@@ -504,6 +507,7 @@ impl From<ScheduleConfig> for Schedule {
         match c.schedule_type {
             SupportedSchedules::EveryDay => Schedule::EveryDay,
             SupportedSchedules::EndOfMonth => Schedule::EveryMonth(27),
+            SupportedSchedules::StartOfMonth => Schedule::StartOfMonth,
         }
     }
 }
@@ -513,6 +517,7 @@ impl From<&ScheduleConfig> for Schedule {
         match c.schedule_type {
             SupportedSchedules::EveryDay => Schedule::EveryDay,
             SupportedSchedules::EndOfMonth => Schedule::EveryMonth(27),
+            SupportedSchedules::StartOfMonth => Schedule::StartOfMonth,
         }
     }
 }

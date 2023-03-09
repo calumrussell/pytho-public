@@ -11,7 +11,7 @@ use antevorta::strat::StaticInvestmentStrategy;
 
 #[test]
 fn sim_test() {
-    let clock = ClockBuilder::with_length_in_dates(1, 100)
+    let clock = ClockBuilder::with_length_in_days(1, 1000)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
     let src = build_hashmapsource_random(Rc::clone(&clock));
@@ -49,7 +49,7 @@ fn sim_test() {
                 "value": 4000.0,
                 "static_growth": 0.0001,
                 "schedule": {
-                    "schedule_type": "EndOfMonth"
+                    "schedule_type": "StartOfMonth"
                 }
             }
         ],
@@ -78,5 +78,9 @@ fn sim_test() {
         sim.update();
     }
 
-    sim.get_tracker();
+    let tracker = sim.get_tracker();
+    let perf = tracker.get_perf();
+
+    dbg!(perf.sipp, perf.isa);
+    assert!(true == false);
 }
