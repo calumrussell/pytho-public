@@ -377,6 +377,5 @@ mod tests {
         let antevorta = setup();
         //This is larger dataset, this tests that we load without errors
         let _res = antevorta_multiple(antevorta.into()).unwrap();
-        assert!(true==false);
     }
 }

@@ -208,6 +208,10 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
 
                 let curr_date = self.clock.borrow().now();
 
+                //Must be triggered early because if the strategy needs to generate cash to pay
+                //taxes then we record the cash flow out but the trades don't get executed until
+                //the day after. This is a loophole in the trade flow but it is easier to just
+                //record the state before this happens.
                 self.update_tracker();
 
                 self.rebalance_cash();
@@ -233,9 +237,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 self.isa.finish();
                 self.gia.finish();
                 self.sipp.finish();
-
-                //This will only trigger at the end of the tax year
-                //self.update_tracker();
             }
             SimState::Unrecoverable => {}
         }

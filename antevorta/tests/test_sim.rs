@@ -18,7 +18,7 @@ fn sim_test() {
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 0.5);
-    target_weights.insert("BCD", 0.5);
+    target_weights.insert("BCD", 1.5);
 
     let exchange = DefaultExchangeBuilder::new()
         .with_clock(Rc::clone(&clock))
@@ -79,8 +79,5 @@ fn sim_test() {
     }
 
     let tracker = sim.get_tracker();
-    let perf = tracker.get_perf();
-
-    dbg!(perf.sipp, perf.isa);
-    assert!(true == false);
+    let _perf = tracker.get_perf();
 }
