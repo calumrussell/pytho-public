@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -44,17 +43,17 @@ pub struct HashMapSourceSimInner {
 
 #[derive(Clone, Debug)]
 pub struct HashMapSourceSim {
-    inner: Rc<RefCell<HashMapSourceSimInner>>,
+    inner: Rc<HashMapSourceSimInner>,
 }
 
 impl SimDataSource for HashMapSourceSim {
     fn get_current_house_price_return(&self) -> Option<f64> {
-        let now = self.inner.borrow().clock.borrow().now();
-        self.inner.borrow().house_price_rets.get(&now).copied()
+        let now = self.inner.clock.borrow().now();
+        self.inner.house_price_rets.get(&now).copied()
     }
 
     fn get_trailing_month_inflation(&self) -> f64 {
-        let now = self.inner.borrow().clock.borrow().now();
+        let now = self.inner.clock.borrow().now();
         let now_offset: OffsetDateTime = now.clone().into();
 
         let last_month = now_offset.month().previous();
@@ -62,10 +61,10 @@ impl SimDataSource for HashMapSourceSim {
         let last_month_internal: DateTime = last_month_offset.into();
 
         let mut tmp = 1.0;
-        for date in self.inner.borrow().clock.borrow().peek() {
+        for date in self.inner.clock.borrow().peek() {
             if date > last_month_internal && date < now {
                 //peek returns values that definitely exist so we can unwrap safely
-                let val = self.inner.borrow().inflation.get(&now).unwrap().clone();
+                let val = self.inner.inflation.get(&now).unwrap().clone();
                 tmp *= 1.0 + val;
             }
         }
@@ -73,16 +72,16 @@ impl SimDataSource for HashMapSourceSim {
     }
 
     fn get_trailing_year_inflation(&self) -> f64 {
-        let now = self.inner.borrow().clock.borrow().now();
+        let now = self.inner.clock.borrow().now();
         let now_offset: OffsetDateTime = now.clone().into();
         let last_year = now_offset.replace_year(now_offset.year() - 1).unwrap();
         let last_year_internal: DateTime = last_year.into();
 
         let mut tmp = 1.0;
-        for date in self.inner.borrow().clock.borrow().peek() {
+        for date in self.inner.clock.borrow().peek() {
             if date > last_year_internal && date < now {
                 //peek returns values that definitely exist so we can unwrap safely
-                let val = self.inner.borrow().inflation.get(&now).unwrap().clone();
+                let val = self.inner.inflation.get(&now).unwrap().clone();
                 tmp *= 1.0 + val;
             }
         }
@@ -90,37 +89,37 @@ impl SimDataSource for HashMapSourceSim {
     }
 
     fn get_current_inflation(&self) -> Option<f64> {
-        let now = self.inner.borrow().clock.borrow().now();
-        self.inner.borrow().inflation.get(&now).copied()
+        let now = self.inner.clock.borrow().now();
+        self.inner.inflation.get(&now).copied()
     }
 
     fn get_current_interest_rate(&self) -> Option<f64> {
-        let now = self.inner.borrow().clock.borrow().now();
-        self.inner.borrow().rates.get(&now).copied()
+        let now = self.inner.clock.borrow().now();
+        self.inner.rates.get(&now).copied()
     }
 }
 
 impl DataSource for HashMapSourceSim {
-    fn get_quote(&self, symbol: &str) -> Option<Quote> {
-        let curr_date = self.inner.borrow().clock.borrow().now();
-        if let Some(quotes) = self.inner.borrow().quotes.get(&curr_date) {
+    fn get_quote(&self, symbol: &str) -> Option<&Quote> {
+        let curr_date = self.inner.clock.borrow().now();
+        if let Some(quotes) = self.inner.quotes.get(&curr_date) {
             for quote in quotes {
                 if quote.symbol.eq(symbol) {
-                    return Some(quote.clone());
+                    return Some(quote);
                 }
             }
         }
         None
     }
 
-    fn get_quotes(&self) -> Option<Vec<Quote>> {
-        let curr_date = self.inner.borrow().clock.borrow().now();
-        self.inner.borrow().quotes.get(&curr_date).cloned()
+    fn get_quotes(&self) -> Option<&Vec<Quote>> {
+        let curr_date = self.inner.clock.borrow().now();
+        self.inner.quotes.get(&curr_date)
     }
 
-    fn get_dividends(&self) -> Option<Vec<Dividend>> {
-        let curr_date = self.inner.borrow().clock.borrow().now();
-        self.inner.borrow().dividends.get(&curr_date).cloned()
+    fn get_dividends(&self) -> Option<&Vec<Dividend>> {
+        let curr_date = self.inner.clock.borrow().now();
+        self.inner.dividends.get(&curr_date)
     }
 }
 
@@ -142,7 +141,7 @@ impl HashMapSourceSim {
             dividends,
         };
         Self {
-            inner: Rc::new(RefCell::new(tmp)),
+            inner: Rc::new(tmp),
         }
     }
 }
