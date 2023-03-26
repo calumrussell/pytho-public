@@ -45,7 +45,6 @@ pub struct UKSimulationPerformanceTracker {
     sipp_contributions: Vec<CashValue>,
 }
 
-
 impl UKSimulationPerformanceTracker {
     fn init() -> Self {
         Self {
@@ -73,6 +72,10 @@ impl UKSimulationPerformanceTracker {
             tax_paid: self.tax_paid.get(idx).unwrap().clone(),
             sipp_contributions: self.sipp_contributions.get(idx).unwrap().clone(),
         }
+    }
+
+    pub fn get_investment_dates(&self) -> Vec<i64> {
+        self.isa_snapshot.iter().map(|v| *v.date.clone()).collect()
     }
 
     pub fn get_perf(&self) -> UKSimulationPerformancePortfolioStats {

@@ -10,11 +10,13 @@ use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
+use smartcore::linalg::basic::matrix::DenseMatrix;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
-use smartcore::linalg::basic::arrays::ArrayView1;
+use smartcore::linalg::basic::arrays::{ArrayView1, Array};
+use smartcore::linalg::basic::arrays::Array2;
 
 pub fn build_price_input_from_raw_close_prices(
     close: &Vec<Vec<EodRow>>,
@@ -81,6 +83,10 @@ pub struct AntevortaResults {
     pub net_income_avg: Vec<f64>,
     pub contribution_avg: Vec<f64>,
     pub expense_avg: Vec<f64>,
+    pub sipp_return_dist: Vec<Vec<f64>>,
+    pub isa_return_dist: Vec<Vec<f64>>,
+    pub gia_return_dist: Vec<Vec<f64>>,
+    pub investment_dates: Vec<i64>,
 }
 
 fn parse_results(
@@ -94,6 +100,8 @@ fn parse_results(
     let mut net_income_avg = Vec::new();
     let mut contribution_avg = Vec::new();
     let mut expense_avg = Vec::new();
+
+    let investment_dates = trackers.first().unwrap().get_investment_dates();
 
     for tracker in &trackers {
         total_end_value.push(*tracker.get_final_value());
@@ -130,9 +138,32 @@ fn parse_results(
         expense_avg.push(expense.sum() / expense.len() as f64);
     }
 
+    let mut sipp_returns = Vec::new();
+    let mut isa_returns = Vec::new();
+    let mut gia_returns = Vec::new();
     for tracker in &trackers {
-        dbg!(tracker.get_perf().isa.returns, tracker.get_perf().sipp.returns);
-        dbg!(tracker.get_perf().isa.ret, tracker.get_perf().sipp.ret);
+        let perf = tracker.get_perf();
+        sipp_returns.push(perf.sipp.returns);
+        isa_returns.push(perf.isa.returns);
+        gia_returns.push(perf.gia.returns);
+    }
+
+    let mut sipp_return_dist = Vec::new();
+    let sipp_returns_trans = DenseMatrix::from_2d_vec(&sipp_returns).transpose();
+    let mut isa_return_dist = Vec::new();
+    let isa_returns_trans = DenseMatrix::from_2d_vec(&isa_returns).transpose();
+    let mut gia_return_dist = Vec::new();
+    let gia_returns_trans = DenseMatrix::from_2d_vec(&gia_returns).transpose();
+    let rows = sipp_returns_trans.shape().0;
+    for i in 0..rows {
+        let sipp_year = sipp_returns_trans.get_row(i as usize);
+        sipp_return_dist.push(vec![sipp_year.mean_by(), sipp_year.min(), sipp_year.max()]);
+
+        let isa_year = isa_returns_trans.get_row(i as usize);
+        isa_return_dist.push(vec![isa_year.mean_by(), isa_year.min(), isa_year.max()]);
+
+        let gia_year = gia_returns_trans.get_row(i as usize);
+        gia_return_dist.push(vec![gia_year.mean_by(), gia_year.min(), gia_year.max()]);
     }
 
     AntevortaResults {
@@ -143,6 +174,10 @@ fn parse_results(
         net_income_avg,
         contribution_avg,
         expense_avg,
+        sipp_return_dist,
+        isa_return_dist,
+        gia_return_dist,
+        investment_dates,
     }
 }
 
@@ -376,6 +411,8 @@ mod tests {
     pub fn test_antevorta_load() {
         let antevorta = setup();
         //This is larger dataset, this tests that we load without errors
-        let _res = antevorta_multiple(antevorta.into()).unwrap();
+        let res = antevorta_multiple(antevorta.into()).unwrap();
+        dbg!(res);
+        assert!(true == false);
     }
 }
