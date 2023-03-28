@@ -5,18 +5,16 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::country::uk::{Config, UKSimulationPerformanceTracker};
+use antevorta::country::uk::Config;
 use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
+use antevorta::output::{StandardSimulationOutput, ProducesStandardSimulationOutput};
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
-use smartcore::linalg::basic::matrix::DenseMatrix;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
-use smartcore::linalg::basic::arrays::{ArrayView1, Array};
-use smartcore::linalg::basic::arrays::Array2;
 
 pub fn build_price_input_from_raw_close_prices(
     close: &Vec<Vec<EodRow>>,
@@ -76,109 +74,7 @@ pub struct EodRawAntevortaInput {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaResults {
-    pub total_end_value: Vec<f64>,
-    pub total_value_avg: Vec<f64>,
-    pub tax_paid_avg: Vec<f64>,
-    pub gross_income_avg: Vec<f64>,
-    pub net_income_avg: Vec<f64>,
-    pub contribution_avg: Vec<f64>,
-    pub expense_avg: Vec<f64>,
-    pub sipp_return_dist: Vec<Vec<f64>>,
-    pub isa_return_dist: Vec<Vec<f64>>,
-    pub gia_return_dist: Vec<Vec<f64>>,
-    pub investment_dates: Vec<i64>,
-}
-
-fn parse_results(
-    trackers: Vec<UKSimulationPerformanceTracker>,
-    sim_length_in_years: u8,
-) -> AntevortaResults {
-    let mut total_end_value = Vec::new();
-    let mut total_value_avg = Vec::new();
-    let mut tax_paid_avg = Vec::new();
-    let mut gross_income_avg = Vec::new();
-    let mut net_income_avg = Vec::new();
-    let mut contribution_avg = Vec::new();
-    let mut expense_avg = Vec::new();
-
-    let investment_dates = trackers.first().unwrap().get_investment_dates();
-
-    for tracker in &trackers {
-        total_end_value.push(*tracker.get_final_value());
-    }
-
-    for year in 0..sim_length_in_years {
-        let mut total_value = Vec::new();
-        let mut tax_paid = Vec::new();
-        let mut gross_income = Vec::new();
-        let mut net_income = Vec::new();
-        let mut contribution = Vec::new();
-        let mut expense = Vec::new();
-
-        for tracker in &trackers {
-            let tracker_year = tracker.get_year(year as usize);
-
-            let value_sum = *tracker_year.isa_snapshot.portfolio_value
-                + *tracker_year.gia_snapshot.portfolio_value
-                + *tracker_year.sipp_snapshot.portfolio_value
-                + *tracker_year.cash;
-
-            total_value.push(value_sum);
-            tax_paid.push(*tracker_year.tax_paid);
-            gross_income.push(*tracker_year.gross_income);
-            net_income.push(*tracker_year.net_income);
-            contribution.push(*tracker_year.sipp_contributions);
-            expense.push(*tracker_year.expense);
-        }
-        total_value_avg.push(total_value.sum() / total_value.len() as f64);
-        tax_paid_avg.push(tax_paid.sum() / tax_paid.len() as f64);
-        gross_income_avg.push(gross_income.sum() / gross_income.len() as f64);
-        net_income_avg.push(net_income.sum() / net_income.len() as f64);
-        contribution_avg.push(contribution.sum() / contribution.len() as f64);
-        expense_avg.push(expense.sum() / expense.len() as f64);
-    }
-
-    let mut sipp_returns = Vec::new();
-    let mut isa_returns = Vec::new();
-    let mut gia_returns = Vec::new();
-    for tracker in &trackers {
-        let perf = tracker.get_perf();
-        sipp_returns.push(perf.sipp.returns);
-        isa_returns.push(perf.isa.returns);
-        gia_returns.push(perf.gia.returns);
-    }
-
-    let mut sipp_return_dist = Vec::new();
-    let sipp_returns_trans = DenseMatrix::from_2d_vec(&sipp_returns).transpose();
-    let mut isa_return_dist = Vec::new();
-    let isa_returns_trans = DenseMatrix::from_2d_vec(&isa_returns).transpose();
-    let mut gia_return_dist = Vec::new();
-    let gia_returns_trans = DenseMatrix::from_2d_vec(&gia_returns).transpose();
-    let rows = sipp_returns_trans.shape().0;
-    for i in 0..rows {
-        let sipp_year = sipp_returns_trans.get_row(i as usize);
-        sipp_return_dist.push(vec![sipp_year.mean_by(), sipp_year.min(), sipp_year.max()]);
-
-        let isa_year = isa_returns_trans.get_row(i as usize);
-        isa_return_dist.push(vec![isa_year.mean_by(), isa_year.min(), isa_year.max()]);
-
-        let gia_year = gia_returns_trans.get_row(i as usize);
-        gia_return_dist.push(vec![gia_year.mean_by(), gia_year.min(), gia_year.max()]);
-    }
-
-    AntevortaResults {
-        total_end_value,
-        total_value_avg,
-        tax_paid_avg,
-        gross_income_avg,
-        net_income_avg,
-        contribution_avg,
-        expense_avg,
-        sipp_return_dist,
-        isa_return_dist,
-        gia_return_dist,
-        investment_dates,
-    }
+    pub results: Vec<StandardSimulationOutput>,
 }
 
 pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResults, Box<dyn Error>> {
@@ -188,7 +84,7 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
 
     let mut results = Vec::new();
 
-    for i in 0..input.runs {
+    for _i in 0..input.runs {
         let start_date = epoch_dates.first().unwrap().clone();
         let sim_length_in_days = (input.sim_length * 365) as i64;
 
@@ -249,9 +145,9 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
             sim.update();
             clock.borrow_mut().tick();
         }
-        results.push(sim.get_tracker());
+        results.push(sim.get_tracker().get_output());
     }
-    Ok(parse_results(results, input.sim_length as u8))
+    Ok(AntevortaResults { results })
 }
 
 #[cfg(test)]
@@ -411,8 +307,6 @@ mod tests {
     pub fn test_antevorta_load() {
         let antevorta = setup();
         //This is larger dataset, this tests that we load without errors
-        let res = antevorta_multiple(antevorta.into()).unwrap();
-        dbg!(res);
-        assert!(true == false);
+        let _res = antevorta_multiple(antevorta.into()).unwrap();
     }
 }

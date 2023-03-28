@@ -87,48 +87,110 @@ const responseSchema = {
             data: {
                 type: 'object',
                 properties: {
-                    total_end_value: {
+                    results: {
                         type: 'array',
                         items: {
-                            type: 'number',
-                        },
-                    },
-                    total_value_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
-                    tax_paid_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
-                    gross_income_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
-                    net_income_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
-                    contribution_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
-                    expense_avg: {
-                        type: 'array',
-                        items: {
-                            type: 'number',
-                        },
-                    },
+                            type: 'object',
+                            properties: {
+                                cash: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                gross_income: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                net_income: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                expense: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                tax_paid: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                sipp_contributions: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                ret: {
+                                    type: 'number',
+                                },
+                                cagr: {
+                                    type: 'number',
+                                },
+                                vol: {
+                                    type: 'number',
+                                },
+                                mdd: {
+                                    type: 'number',
+                                },
+                                sharpe: {
+                                    type: 'number',
+                                },
+                                values: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                returns: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                returns_dates: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                investment_cash_flows: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'number',
+                                    },
+                                },
+                                first_date: {
+                                    type: 'number',
+                                },
+                                last_date: {
+                                    type: 'number',
+                                },
+                                dd_start_date: {
+                                    type: 'number',
+                                },
+                                dd_end_date: {
+                                    type: 'number',
+                                },
+                                best_return: {
+                                    type: 'number',
+                                },
+                                worst_return: {
+                                    type: 'number',
+                                },
+                                frequency: {
+                                    type: 'string',
+                                },
+                            }
+                        }
+                    }
                 },
             }
         },
