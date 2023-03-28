@@ -11,8 +11,12 @@ import {
   Button,
 } from '@Common';
 import {
-  useUser,
+  useUserDispatch,
 } from '@Components/reducers/user';
+import {
+  useMessage
+} from '@Components/reducers/message';
+import { loginUser } from '@Api/user';
 
 export const LoginForm = (props) => {
   const [
@@ -20,18 +24,29 @@ export const LoginForm = (props) => {
     setUserKey,
   ] = useState('');
 
+  const {
+    errorMessage
+  } = useMessage();
+
   const updateFormInput = (ev) => {
     ev.preventDefault();
     setUserKey(ev.target.value);
   };
 
-  const {
-    loginUser,
-  } = useUser();
+  const dispatch = useUserDispatch();
 
   const onFormSubmit = (ev) => {
     ev.preventDefault();
-    loginUser(userKey);
+
+    const successFunc = (res) => {
+      dispatch({ type: "LOGIN", userKey})
+    }
+
+    const errorFunc = (err) => {
+      errorMessage(err.response.data.message);
+    }
+
+    loginUser(userKey, successFunc, errorFunc);
   };
 
   return (

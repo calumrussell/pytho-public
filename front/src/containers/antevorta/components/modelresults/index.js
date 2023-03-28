@@ -4,7 +4,7 @@ import zip from 'lodash.zip';
 
 import {
   useAntevorta,
-} from '../../reducers/antevorta';
+} from '../../context';
 import {
   useLoader,
 } from '@Components/reducers/loader';
@@ -28,7 +28,7 @@ const RowWrapper = styled.div`
 
 export const ModelResults = (props) => {
   const {
-    state,
+    results,
   } = useAntevorta();
 
   const {
@@ -37,7 +37,7 @@ export const ModelResults = (props) => {
 
   const Loader = renderLoader();
 
-  if (state.results) {
+  if (results) {
     const {
       runs,
       gross_income_avg,
@@ -45,7 +45,7 @@ export const ModelResults = (props) => {
       contribution_avg,
       expense_avg,
       total_end_value,
-    } = state.results;
+    } = results;
 
     const avg = total_end_value.reduce((acc, curr) => acc+curr, 0) / total_end_value.length;
 

@@ -15,9 +15,6 @@ import {
   MessageProvider,
 } from '@Components/reducers/message';
 import {
-  PlanStoreProvider,
-} from '@Components/reducers/planstore';
-import {
   Message,
 } from '@Common';
 
@@ -71,42 +68,40 @@ export const App = (props) => {
     <Router>
       <GlobalStyle />
       <AppWrapper>
-        <PlanStoreProvider>
-          <MessageProvider>
-            <UserProvider>
-              <Header
-                showMenu={ showMenu }
-                toggleMenu={ toggleMenu } />
-              <SideMenu
-                toggleMenu={ toggleMenu }
-                showMenu={ showMenu } />
-              <Message />
-              <PageWrapper>
-                <Routes>
-                  <Route
-                    exact
-                    path="/"
-                    element={ <Home /> } />
-                  <Route
-                    path="/exposureanalysis"
-                    element={ <AthenaApp /> } />
-                  <Route
-                    path="/incomesim"
-                    element={ <AntevortaApp /> } />
-                  <Route
-                    path="/backtest"
-                    element={ <AphroditeApp /> } />
-                  <Route
-                    path="/user"
-                    element={ <ThemisApp /> } />
-                  <Route
-                    path="/plancreator"
-                    element={ <MetisApp /> } />
-                </Routes>
-              </PageWrapper>
-            </UserProvider>
-          </MessageProvider>
-        </PlanStoreProvider>
+        <MessageProvider>
+          <UserProvider>
+            <Header
+              showMenu={ showMenu }
+              toggleMenu={ toggleMenu } />
+            <SideMenu
+              toggleMenu={ toggleMenu }
+              showMenu={ showMenu } />
+            <Message />
+            <PageWrapper>
+              <Routes>
+                <Route
+                  exact
+                  path="/"
+                  element={ <Home /> } />
+                <Route
+                  path="/exposureanalysis"
+                  element={ <AthenaApp /> } />
+                <Route
+                  path="/incomesim"
+                  element={ <AntevortaApp /> } />
+                <Route
+                  path="/backtest"
+                  element={ <AphroditeApp /> } />
+                <Route
+                  path="/user"
+                  element={ <ThemisApp /> } />
+                <Route
+                  path="/plancreator"
+                  element={ <MetisApp /> } />
+              </Routes>
+            </PageWrapper>
+          </UserProvider>
+        </MessageProvider>
       </AppWrapper>
     </Router>
   );

@@ -11,10 +11,9 @@ import {
   Text,
   ComponentWrapper,
 } from '@Common/index';
-
 import {
-  usePlanStore,
-} from '@Components/reducers/planstore';
+  useUser, useUserDispatch,
+} from '@Components/reducers/user';
 
 interface PlanProps {
   name: string,
@@ -95,52 +94,46 @@ interface PlanStoreProps {
 }
 
 export const PlanStore = ({selectPlanFunc, selectedPlan}: PlanStoreProps) => {
-  const plan = usePlanStore();
-  if (plan) {
-    const {
-      state,
-      removePlan,
-    } = plan;
+  const userState = useUser();
+  const userDispatch = useUserDispatch();
 
-    const plans = state.plans.map((plan, i) => {
-      return (
-        <Plan
-          { ...plan }
-          key={ i }
-          pos={ i }
-          removeFunc={ removePlan }
-          selectFunc={ selectPlanFunc }
-          selected={ selectedPlan===i } />
-      );
-    });
-
+  const plans = userState.plans.map((plan, i) => {
     return (
-      <ComponentWrapper>
-        <PlanStoreWrapper>
-          <Text
-            focus>
-            Saved Plans
-          </Text>
-          <DefaultHorizontalSpacer>
-            { plans }
-            {
-              state.plans.length === 0 && (
-                <Text
-                  italic>
-                  No saved plans
-                </Text>
-              )
-            }
-          </DefaultHorizontalSpacer>
-          <Link
-            to={ '/plancreator' }>
-            <ClickableText>
-              Create Plan
-            </ClickableText>
-          </Link>
-        </PlanStoreWrapper>
-      </ComponentWrapper>
+      <Plan
+        { ...plan }
+        key={ i }
+        pos={ i }
+        removeFunc={ () => userDispatch({type: 'RMV_PLAN', pos: i }) }
+        selectFunc={ selectPlanFunc }
+        selected={ selectedPlan===i } />
     );
-  }
-  return null;
+  });
+
+  return (
+    <ComponentWrapper>
+      <PlanStoreWrapper>
+        <Text
+          focus>
+          Saved Plans
+        </Text>
+        <DefaultHorizontalSpacer>
+          { plans }
+          {
+            userState.plans.length === 0 && (
+              <Text
+                italic>
+                No saved plans
+              </Text>
+            )
+          }
+        </DefaultHorizontalSpacer>
+        <Link
+          to={ '/plancreator' }>
+          <ClickableText>
+            Create Plan
+          </ClickableText>
+        </Link>
+      </PlanStoreWrapper>
+    </ComponentWrapper>
+  );
 };

@@ -8,20 +8,15 @@ import {
   annualiseMonthlyRet,
   DefaultHorizontalSpacer,
   PanelWrapper,
+  AthenaTypes,
 } from '@Common/index';
 import {
   LineChart,
 } from '@Components/charts';
 
-import {
-  Security,
-  ModelResults,
-  Independents,
-} from '../../types';
-
 type IndependentProps = {
-  results: ModelResults,
-  independent: Security,
+  results: AthenaTypes.ModelResults,
+  independent: AthenaTypes.Security,
   pos: number,
 }
 
@@ -59,8 +54,8 @@ const Independent = ({
 };
 
 interface IndependentCProps {
-  results: ModelResults,
-  independent: Independents,
+  results: AthenaTypes.ModelResults,
+  independent: AthenaTypes.Independents,
 }
 
 export const IndependentsC = ({results, independent}: IndependentCProps) => {

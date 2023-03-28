@@ -5,15 +5,20 @@ import {
   SectionWrapper,
 } from '@Common';
 import {
-  usePortfolio,
-} from '@Components/portfolio';
-import {
   useLoader,
 } from '@Components/reducers/loader';
+import {
+  useUser
+} from '@Components/reducers/user';
 
 import {
   useBacktest,
 } from '../../reducers/backtest';
+
+const jsonPortfolio = (portfolio) => ({
+  'assets': portfolio.assets.map((i) => i.id),
+  'weights': portfolio.weights.map((i) => i/100),
+});
 
 export const Results = (props) => {
   const {
@@ -29,13 +34,12 @@ export const Results = (props) => {
   } = useLoader();
 
   const {
-    state: portfolioState,
-    jsonPortfolio,
-  } = usePortfolio();
+    portfolio
+  } = useUser();
 
   const clickLogic = () => {
     const loader = toggleLoader();
-    const portJson = jsonPortfolio();
+    const portJson = jsonPortfolio(portfolio);
     runBacktest(portJson, loader);
   };
 
@@ -43,7 +47,7 @@ export const Results = (props) => {
   return (
     <SectionWrapper>
       <Button
-        disabled={ loadingState.isLoading || portfolioState.isEmpty }
+        disabled={ loadingState.isLoading || portfolio.isEmpty }
         onClick={ clickLogic }>
         Run Backtest
       </Button>

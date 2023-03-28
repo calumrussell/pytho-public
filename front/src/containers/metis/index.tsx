@@ -3,10 +3,10 @@ import React from 'react';
 import {
   SectionWrapper,
 } from '@Common/index';
-import {
-  FPlanProvider,
-} from '@Components/reducers/fplan';
 
+import {
+  MetisProvider,
+} from './context';
 import {
   PlanState,
 } from './components/planstate';
@@ -14,11 +14,11 @@ import {
 export const MetisApp = () => {
 
   return (
-    <FPlanProvider>
+    <MetisProvider>
       <SectionWrapper>
         <PlanState />
       </SectionWrapper>
-    </FPlanProvider>
+    </MetisProvider>
   );
 };
 

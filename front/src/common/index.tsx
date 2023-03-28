@@ -70,6 +70,7 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
   onClick(event: React.MouseEvent<SVGSVGElement>): void;
   height?: string;
   width?: string;
+  value?: string;
 }
 
 export const PlusIcon = (props: IconProps) => {
@@ -526,3 +527,127 @@ export const MultiSelect = ({
     </MultiSelectWrapper>
   );
 };
+
+
+export namespace AntevortaTypes {
+  export enum ScheduleType {
+    EndOfMonth = "EndOfMonth",
+  }
+
+  export interface Schedule {
+    schedule_type: ScheduleType;
+  }
+
+  export enum FlowType {
+    Employment = 'Employment',
+    EmploymentPAYE = 'EmploymentPAYE',
+    EmploymentStaticGrowth = 'EmploymentStaticGrowth',
+    EmploymentPAYEStaticGrowth = 'EmploymentPAYEStaticGrowth',
+    Rental = 'Rental',
+    Expense = 'Expense',
+    PctOfIncomeExpense = 'PctOfIncomeExpense',
+    InflationLinkedExpense = 'InflationLinkedExpense',
+  }
+
+  export interface Flow {
+    flow_type: FlowType;
+    // Currently hardcoded to zero
+    person: number;
+    value?: number;
+    static_growth?: number;
+    pct?: number;
+    // This is hardcoded to EndOfMonth
+    schedule: Schedule;
+  }
+
+  export enum StackType {
+    Isa = 'Isa',
+    Sipp = 'Sipp',
+    Gia = 'Gia',
+    Mortgage = 'Mortgage',
+  }
+
+  export interface Stack {
+    stack_type: StackType;
+    person: number;
+    value: number;
+    rate?: number;
+    term?: number;
+    fix_length?: number;
+  }
+
+  export const isPlanStackEqualType = (
+      existing: Array<Stack>,
+      cand: Stack,
+  ): number => {
+    let count = 0;
+    for (const plan of existing) {
+      if (plan.stack_type === cand.stack_type) {
+        return count;
+      }
+      count++;
+    }
+    return -1;
+  };
+
+  // Only support A
+  export enum NicGroups {
+    A = "A",
+  }
+
+  // Use snake_case because this will go directly into Python
+  export interface FinancialPlan {
+    flows: Array<Flow>,
+    stacks: Array<Stack>,
+    nic: NicGroups,
+    contribution_pct: number,
+    emergency_cash_min: number,
+    starting_cash: number,
+    lifetime_pension_contributions: number,
+  }
+}
+
+export namespace AthenaTypes {
+  export interface CoreResult {
+    regression: {
+      coefs: Array<number>,
+      errors: Array<number>,
+    },
+    avgs: Array<number>,
+  }
+
+  export interface RollingResult {
+    regressions: {
+      coefs: Array<Array<number>>,
+      errors: Array<Array<number>>,
+    },
+    dates: Array<number>,
+  }
+
+  export interface Security {
+    id: number,
+    name: string,
+  }
+
+  export interface Independents {
+    [key: number]: Security,
+  }
+
+  export interface ModelResults {
+    core: CoreResult,
+    rolling: RollingResult,
+  }
+}
+
+export namespace PortfolioTypes {
+  export interface Security {
+    id: number,
+    name: string,
+  }
+
+  export interface Portfolio {
+    assets: Array<Security>,
+    weights: Array<number>,
+    isEmpty: boolean,
+  }
+}

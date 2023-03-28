@@ -8,18 +8,12 @@ import {
   PortfolioSearch,
 } from './components/search';
 import {
-  usePortfolio,
-  PortfolioProvider,
-} from './reducers/portfolio';
-import {
-  PortfolioLoader,
-} from './components/loader';
+  PortfolioDisplay,
+} from './components/display';
 
 export {
   PortfolioPerformance,
   PortfolioBuilder,
   PortfolioSearch,
-  usePortfolio,
-  PortfolioProvider,
-  PortfolioLoader,
+  PortfolioDisplay,
 };

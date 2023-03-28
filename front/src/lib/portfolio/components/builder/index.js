@@ -3,43 +3,85 @@ import React, {
 } from 'react';
 
 import {
-  usePortfolio,
+  Text,
+  Button,
+} from '@Common';
+import {
+  FormWrapper,
+  FormLabel,
+  FormInput,
+} from '@Components/form';
+import {
+  PortfolioSearch,
 } from '@Components/portfolio';
 import {
   SuggestProvider,
+  useSuggest,
 } from '@Components/suggest';
-
 import {
-  PortfolioSaver,
-} from './components/saver';
-import {
-  BuilderForm,
-} from './components/form';
+  useUserDispatch
+} from '@Components/reducers/user';
 
-export const PortfolioBuilder = (props) => {
+export const BuilderForm = (props) => {
   const [
-    showSaver,
-    setShowSaver,
-  ] = useState(false);
+    weight,
+    setWeight,
+  ] = useState(10);
+
   const {
     state,
-  } = usePortfolio();
+    clearInput,
+    clearOptions,
+  } = useSuggest();
 
-  const {
-    isEmpty,
-  } = state;
+  const userDispatch = useUserDispatch();
+
+  const isFinished = weight != '' && state.hasSelected;
+
+  const addSecurity = (e) => {
+    e.preventDefault();
+    userDispatch({
+      type: 'ADD_PORTFOLIO',
+      asset: state.value,
+      weight,
+    })
+    clearInput()
+    clearOptions();
+  };
 
   return (
-    <SuggestProvider>
-      <>
-        <BuilderForm
-          isEmpty={ isEmpty }
-          onClickSave={ () => setShowSaver(!showSaver) }
-        />
-      </>
-      <PortfolioSaver
-        setShowSaver={ setShowSaver }
-        showSaver={ showSaver } />
-    </SuggestProvider>
+    <FormWrapper>
+      <PortfolioSearch />
+      <FormLabel
+        htmlFor="aphrodite-weight">
+        <Text
+          light>
+          Portfolio Weight (%)
+        </Text>
+      </FormLabel>
+      <FormInput
+        id="aphrodite-weight"
+        data-testid="backtest-weight-input"
+        type="number"
+        min="0"
+        max="100"
+        step="10"
+        name="weight"
+        value={ weight }
+        onChange={ (e) => setWeight(Number(e.target.value)) } />
+      <Button
+        disabled={ !isFinished }
+        onClick={ addSecurity }>
+        Add to portfolio
+      </Button>
+    </FormWrapper>
   );
 };
+
+export const PortfolioBuilder = (props) => {
+  return (
+    <SuggestProvider>
+      <BuilderForm />
+    </SuggestProvider>
+  )
+}

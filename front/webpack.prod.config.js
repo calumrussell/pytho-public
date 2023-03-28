@@ -84,5 +84,6 @@ module.exports = {
     '@Common': path.resolve(__dirname, 'src/common'),
     '@Style': path.resolve(__dirname, 'src/common/style.js'),
     '@Components': path.resolve(__dirname, 'src/lib'),
+    '@Api': path.resolve(__dirname, 'src/api'),
   } },
 };

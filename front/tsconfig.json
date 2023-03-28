@@ -13,6 +13,7 @@
     "paths": {
       "@Common/*": ["src/common/*"],
       "@Components/*": ["src/lib/*"],
+      "@Api/*": ["src/api/*"],
     }
   },
   "include": ["src/**/*"],

@@ -1,23 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 import {
   LoaderProvider,
 } from '@Components/reducers/loader';
 import {
-  useMessage,
-} from '@Components/reducers/message';
-import {
   PageWrapper,
   SectionWrapper,
-  Button,
 } from '@Common/index';
-import {
-  PortfolioProvider,
-} from '@Components/portfolio';
 
 import {
   AntevortaProvider,
-} from './reducers/antevorta/';
+} from './context/';
 import {
   PlanStore,
 } from './components/planstore';
@@ -36,22 +29,20 @@ export const AntevortaApp = () => {
     <PageWrapper
       id="antevorta-main">
       <AntevortaProvider>
-        <PortfolioProvider>
-          <LoaderProvider>
-            <SectionWrapper>
-              <PlanStore 
-                selectedPlan={selectedPlan}
-                selectPlanFunc={setSelectedPlan} />
-            </SectionWrapper>
-            <SectionWrapper>
-              <ModelRunner 
-                selectedPlanPos={selectedPlan}/>
-            </SectionWrapper>
-            <SectionWrapper>
-              <ModelResults />
-            </SectionWrapper>
-          </LoaderProvider>
-        </PortfolioProvider>
+        <LoaderProvider>
+          <SectionWrapper>
+            <PlanStore 
+              selectedPlan={selectedPlan}
+              selectPlanFunc={setSelectedPlan} />
+          </SectionWrapper>
+          <SectionWrapper>
+            <ModelRunner 
+              selectedPlanPos={selectedPlan}/>
+          </SectionWrapper>
+          <SectionWrapper>
+            <ModelResults />
+          </SectionWrapper>
+        </LoaderProvider>
       </AntevortaProvider>
     </PageWrapper>
   )

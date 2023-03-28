@@ -7,19 +7,15 @@ import {
   annualiseMonthlyRet,
   DefaultHorizontalSpacer,
   PanelWrapper,
+  AthenaTypes,
 } from '@Common/index';
 import {
   LineChart,
 } from '@Components/charts';
 
-import {
-  Security,
-  ModelResults,
-} from '../../types';
-
 interface DependentProps {
-  results: ModelResults,
-  dependent: Security
+  results: AthenaTypes.ModelResults,
+  dependent: AthenaTypes.Security
 }
 
 export const Dependent = ({ results, dependent }: DependentProps) => {

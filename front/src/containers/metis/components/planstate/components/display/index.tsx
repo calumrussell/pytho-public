@@ -6,9 +6,8 @@ import {
   Text,
 } from '@Common/index';
 import {
-  PlanFlow,
-  PlanStack,
-} from '@Components/reducers/fplan';
+  AntevortaTypes
+} from '@Common/index';
 
 const RowWrapper = styled.div`
   display: flex;
@@ -26,7 +25,7 @@ const RowWrapper = styled.div`
 
 interface FlowProps {
   pos: number;
-  flow: PlanFlow;
+  flow: AntevortaTypes.Flow;
   removeFunc: (pos: number) => void;
 }
 
@@ -57,7 +56,7 @@ export const FlowDisplay = ({
 
 interface StackProps {
   pos: number;
-  stack: PlanStack;
+  stack: AntevortaTypes.Stack;
   removeFunc: (pos: number) => void;
 }
 

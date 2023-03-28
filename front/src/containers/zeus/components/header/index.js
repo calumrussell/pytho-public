@@ -11,6 +11,10 @@ import {
   useUser,
 } from '@Components/reducers/user';
 import {
+  checkUser
+} from '@Api';
+
+import {
   Text,
   ClickableText,
 } from '@Common';
@@ -60,10 +64,8 @@ const PageHeaderTitleStyle = styled.div`
 export const Header = ({
   showMenu, toggleMenu,
 }) => {
-  const {
-    state,
-    checkUser,
-  } = useUser();
+
+  const userState = useUser();
 
   useEffect(() => {
     // We check on every change of state, but we only need do anything in the
@@ -74,8 +76,8 @@ export const Header = ({
   ]);
 
   const UserKey = () => {
-    if (state.isLoggedIn) {
-      const fmtUserKey = state.user.slice(0, 5) + '...';
+    if (userState.isLoggedIn) {
+      const fmtUserKey = userState.user.slice(0, 5) + '...';
       return (
         <Text>
           {fmtUserKey}

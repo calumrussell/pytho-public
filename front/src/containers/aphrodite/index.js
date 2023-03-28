@@ -5,9 +5,7 @@ import {
 } from '@Components/reducers/loader';
 import {
   PortfolioBuilder,
-  PortfolioProvider,
-  PortfolioLoader,
-  usePortfolio,
+  PortfolioDisplay,
 } from '@Components/portfolio';
 import {
   SectionWrapper, ComponentWrapper,
@@ -21,11 +19,6 @@ import {
 } from './reducers/backtest';
 
 const Aphrodite = (props) => {
-  const {
-    displayPortfolio,
-  } = usePortfolio();
-
-  const PortfolioDisplay = displayPortfolio();
 
   return (
     <>
@@ -34,7 +27,6 @@ const Aphrodite = (props) => {
         <ComponentWrapper>
           <PortfolioBuilder />
           <PortfolioDisplay />
-          <PortfolioLoader />
         </ComponentWrapper>
       </SectionWrapper>
       <SectionWrapper>
@@ -46,13 +38,11 @@ const Aphrodite = (props) => {
 
 export const AphroditeApp = (props) => {
   return (
-    <PortfolioProvider>
-      <BacktestProvider>
-        <LoaderProvider>
-          <Aphrodite
-            { ...props } />
-        </LoaderProvider>
-      </BacktestProvider>
-    </PortfolioProvider>
+    <BacktestProvider>
+      <LoaderProvider>
+        <Aphrodite
+          { ...props } />
+      </LoaderProvider>
+    </BacktestProvider>
   );
 };

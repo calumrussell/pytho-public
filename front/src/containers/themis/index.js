@@ -6,65 +6,94 @@ import {
   Button,
   Text,
   DoubleHorizontalSpacer,
+  RenderIf,
 } from '@Common';
 import {
   useUser,
+  useUserDispatch,
 } from '@Components/reducers/user';
+import {
+  useMessage,
+} from '@Components/reducers/message';
+import {
+  createUser,
+  logoutUser,
+} from '@Api';
 
 import {
   LoginForm,
 } from './components/login';
 
 export const ThemisApp = (props) => {
+  const userState = useUser();
+  const dispatch = useUserDispatch();
+
   const {
-    state,
-    createUser,
-    logoutUser,
-    loggedOutHoc,
-    loggedInHoc,
-  } = useUser();
+    errorMessage
+  } = useMessage();
 
-  const CreateUser = (props) => (
-    <Button
-      onClick={ () => createUser() }>
-      Create User
-    </Button>
-  );
-  const CreateUserShowWhenLoggedOut = loggedOutHoc(CreateUser);
+  const createUserOnClick = () => {
+    const successFunc = (res) => dispatch({
+      type: 'LOGIN',
+      userKey: res.userKey,
+    })
 
-  const LoginUserFormShowWhenLoggedOut = loggedOutHoc(LoginForm);
+    const errorFunc = (err) => {
+      if (err.response.status == 401) {
+        if (userState.isLoggedIn) {
+          dispatch({ type: 'LOGOUT'})
+        }
+      }
+      errorMessage(err.response.data.message);
+    }
+    createUser(successFunc, errorFunc);
+  };
 
-  const LogoutUser = (props) => (
-    <Button
-      onClick={ () => logoutUser() }>
-      Logout User
-    </Button>
-  );
-  const LogoutUserShowWhenLoggedIn = loggedInHoc(LogoutUser);
-
-  const UserInfo = (props) => (
-    <Text>
-      User key:
-      {' '}
-      <br />
-      {state.user}
-    </Text>
-  );
-  const UserInfoShowWhenLoggedIn = loggedInHoc(UserInfo);
+  const logoutUserOnClick = () => {
+    const successFunc = () => dispatch({ type: 'LOGOUT' })
+    const errorFunc = (err) => {
+      if (err.response.status == 401) {
+        if (userState.isLoggedIn) {
+          dispatch({ type: 'LOGOUT'})
+        }
+      }
+      errorMessage(err.response.data.message);
+    }
+    logoutUser(successFunc, errorFunc);
+  };
 
   return (
     <SectionWrapper>
       <ComponentWrapper>
-        <CreateUserShowWhenLoggedOut />
+        <RenderIf cond={!userState.isLoggedIn}>
+          <Button
+            onClick={ () => createUserOnClick() }>
+            Create User
+          </Button>
+        </RenderIf>
       </ComponentWrapper>
       <ComponentWrapper>
-        <LoginUserFormShowWhenLoggedOut />
+        <RenderIf cond={!userState.isLoggedIn}>
+          <LoginForm />
+        </RenderIf>
       </ComponentWrapper>
       <ComponentWrapper>
-        <UserInfoShowWhenLoggedIn />
+        <RenderIf cond={userState.isLoggedIn}>
+          <Text>
+            User key:
+            {' '}
+            <br />
+            {userState.user}
+          </Text>
+        </RenderIf>
       </ComponentWrapper>
       <ComponentWrapper>
-        <LogoutUserShowWhenLoggedIn />
+        <RenderIf cond={userState.isLoggedIn}>
+          <Button
+            onClick={ () => logoutUserOnClick() }>
+            Logout User
+          </Button>
+        </RenderIf>
       </ComponentWrapper>
       <ComponentWrapper>
         <DoubleHorizontalSpacer>
