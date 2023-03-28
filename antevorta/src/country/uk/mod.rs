@@ -20,6 +20,7 @@ use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
+use crate::output::{ProducesStandardSimulationOutput, StandardSimulationOutput};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -60,38 +61,59 @@ impl UKSimulationPerformanceTracker {
         }
     }
 
-    pub fn get_year(&self, idx: usize) -> UKSimulationPerformanceAnnualFrame {
-        UKSimulationPerformanceAnnualFrame {
-            isa_snapshot: self.isa_snapshot.get(idx).unwrap().clone(),
-            sipp_snapshot: self.sipp_snapshot.get(idx).unwrap().clone(),
-            gia_snapshot: self.gia_snapshot.get(idx).unwrap().clone(),
-            cash: self.cash.get(idx).unwrap().clone(),
-            gross_income: self.gross_income.get(idx).unwrap().clone(),
-            net_income: self.net_income.get(idx).unwrap().clone(),
-            expense: self.expense.get(idx).unwrap().clone(),
-            tax_paid: self.tax_paid.get(idx).unwrap().clone(),
-            sipp_contributions: self.sipp_contributions.get(idx).unwrap().clone(),
-        }
-    }
-
-    pub fn get_investment_dates(&self) -> Vec<i64> {
-        self.isa_snapshot.iter().map(|v| *v.date.clone()).collect()
-    }
-
-    pub fn get_perf(&self) -> UKSimulationPerformancePortfolioStats {
-        UKSimulationPerformancePortfolioStats {
-            isa: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.isa_snapshot.clone()),
-            gia: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.gia_snapshot.clone()),
-            sipp: PerformanceCalculator::calculate(alator::types::Frequency::Monthly, self.sipp_snapshot.clone()),
-        }
-    }
-
     pub fn get_final_value(&self) -> CashValue {
         let total_value = *self.isa_snapshot.last().unwrap().portfolio_value
             + *self.gia_snapshot.last().unwrap().portfolio_value
             + *self.sipp_snapshot.last().unwrap().portfolio_value
             + **self.cash.last().unwrap();
         CashValue::from(total_value)
+    }
+}
+
+impl ProducesStandardSimulationOutput for UKSimulationPerformanceTracker {
+    fn get_output(&self) -> StandardSimulationOutput {
+        let mut joined_snaps = Vec::new();
+        for (isa, sipp, gia ) in self.isa_snapshot.iter().zip(self.gia_snapshot.iter()).zip(self.sipp_snapshot.iter()).map(|((x, y), z)| (x, y, z)) {
+            let date = isa.date.clone();
+            //Should be the same across account types
+            let inflation = isa.inflation;
+
+            let value = CashValue::from(&*isa.portfolio_value + &*sipp.portfolio_value + &*gia.portfolio_value);
+            let net_cash_flow = CashValue::from(&*isa.net_cash_flow + &*sipp.net_cash_flow + &*gia.net_cash_flow);
+
+            joined_snaps.push(StrategySnapshot {
+                date,
+                inflation,
+                portfolio_value: value,
+                net_cash_flow
+            });
+        }
+        let perf = PerformanceCalculator::calculate(alator::types::Frequency::Monthly, joined_snaps);
+
+        StandardSimulationOutput {
+            returns_dates: perf.dates,
+            returns: perf.returns,
+            ret: perf.ret,
+            cagr: perf.cagr,
+            vol: perf.vol,
+            mdd: perf.mdd,
+            investment_cash_flows: perf.cash_flows,
+            sharpe: perf.sharpe,
+            values: perf.values,
+            first_date: perf.first_date,
+            last_date: perf.last_date,
+            best_return: perf.best_return,
+            worst_return: perf.worst_return,
+            frequency: perf.frequency,
+            dd_end_date: perf.dd_end_date,
+            dd_start_date: perf.dd_start_date,
+            gross_income: self.gross_income.iter().map(|v| **v).collect(),
+            net_income: self.net_income.iter().map(|v| **v).collect(),
+            cash: self.cash.iter().map(|v| **v).collect(),
+            expense: self.expense.iter().map(|v| **v).collect(),
+            tax_paid: self.tax_paid.iter().map(|v| **v).collect(),
+            sipp_contributions: self.sipp_contributions.iter().map(|v| **v).collect(),
+        }
     }
 }
 
