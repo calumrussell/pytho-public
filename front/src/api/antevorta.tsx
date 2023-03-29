@@ -14,9 +14,35 @@ export interface AntevortaRequestInput {
   inflation_var: number,
 }
 
+export interface AntevortaStandardSimulationOutput {
+  cash: Array<number>,
+  gross_income: Array<number>,
+  net_income: Array<number>,
+  expense: Array<number>,
+  tax_paid: Array<number>,
+  sipp_contributions: Array<number>,
+  ret: number,
+  cagr: number,
+  vol: number,
+  mdd: number,
+  sharpe: number,
+  values: Array<number>,
+  returns: Array<number>,
+  returns_dates: Array<number>,
+  investment_cash_flows: Array<number>,
+  first_date: number,
+  last_date: number,
+  dd_start_date: number,
+  dd_end_date: number,
+  best_return: number,
+  worst_return: number,
+  frequency: string,
+}
+
 export interface AntevortaRequestOutput {
   runs: number,
-  values: Array<number>,
+  sim_length: number,
+  results: Array<AntevortaStandardSimulationOutput>,
 }
 
 // Before we send this to server, we perform some error-checking. This is
@@ -52,7 +78,7 @@ export const antevortaRequest = (input: AntevortaRequestInput, successFunc: (res
       request(`/incomesim`)
         .post({ ...input, sim_config: sim_config_str })
         .then((res) => res.data)
-        .then((res) => successFunc({runs: input.runs, ...res.data}))
+        .then((res) => successFunc({runs: input.runs, sim_length: input.sim_length, ...res.data}))
         .catch(errFunc)
         .finally(finallyFunc);
     })

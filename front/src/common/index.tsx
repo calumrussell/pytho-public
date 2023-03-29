@@ -390,6 +390,10 @@ export const Nullable = ({
 };
 
 const roundNumber = (n: number): number => Math.round(n * 100) / 100;
+export const strConverterCurr = (curr: number) => {
+  return new Intl.NumberFormat('en-GB', { style: 'currency', maximumSignificantDigits: 3, currency: "GBP" }).format(curr);
+}
+export const dateConverter = (epoch: number) => new Date(epoch * 1000).toLocaleDateString('en-GB');
 export const strConverterMult =
   (scalar: number): string => roundNumber(scalar*100).toFixed(2);
 export const strConverter =
@@ -649,5 +653,15 @@ export namespace PortfolioTypes {
     assets: Array<Security>,
     weights: Array<number>,
     isEmpty: boolean,
+  }
+}
+
+export namespace Operations {
+  export const transpose = (matrix: Array<Array<number>>) => {
+    return matrix[0].map((col, i) => matrix.map(row => row[i]));
+  }
+
+  export const average = (values: Array<number>) => {
+    return values.reduce((prev, curr) => prev+curr, 0) / values.length;
   }
 }

@@ -1,35 +1,28 @@
 import React from 'react';
-import styled from 'styled-components';
 import zip from 'lodash.zip';
 
-import {
-  useAntevorta,
-} from '../../context';
 import {
   useLoader,
 } from '@Components/reducers/loader';
 import {
-  strConverter,
+  DefaultHorizontalSpacer,
   ComponentWrapper,
-  NumberWithTitle,
   Text,
+  Operations,
 } from '@Common';
 import {
   HistogramChart,
   StackedBarChart,
 } from '@Components/charts';
-import { DefaultHorizontalSpacer } from '@Common/index';
 
-const RowWrapper = styled.div`
-  display: flex;
-  justify-content: space-around;
-  margin: 1rem 0;
-`;
+import {
+  useAntevorta,
+} from '../../context';
+import { YearlyTable } from './components/yearlytable';
+import { InfoHeader } from './components/infoheader';
 
 export const ModelResults = (props) => {
-  const {
-    results,
-  } = useAntevorta();
+  const state = useAntevorta();
 
   const {
     renderLoader,
@@ -37,17 +30,43 @@ export const ModelResults = (props) => {
 
   const Loader = renderLoader();
 
-  if (results) {
+  if (state.results) {
     const {
       runs,
-      gross_income_avg,
-      tax_paid_avg,
-      contribution_avg,
-      expense_avg,
-      total_end_value,
-    } = results;
+      results,
+    } = state.results;
 
-    const avg = total_end_value.reduce((acc, curr) => acc+curr, 0) / total_end_value.length;
+    const gross_income = new Array();
+    const net_income = new Array();
+    const tax_paid = new Array();
+    const contribution = new Array();
+    const expense = new Array();
+    const total_end_value = new Array();
+    const returns = new Array();
+    const investment_dates = results[0].returns_dates;
+    const investment_values = new Array();
+
+    results.map(result => {
+      gross_income.push(result.gross_income);
+      net_income.push(result.net_income);
+      tax_paid.push(result.tax_paid);
+      contribution.push(result.sipp_contributions);
+      expense.push(result.expense);
+      total_end_value.push(result.values[result.values.length-1] + result.cash[result.cash.length-1]);
+      investment_values.push(result.values);
+
+      //shallow
+      let rets_copy = [...result.returns];
+      rets_copy.unshift(0);
+      returns.push(rets_copy);
+    })
+
+    const calc_avg = values => Operations.transpose(values).map(Operations.average);
+
+    const gross_income_avg = calc_avg(gross_income);
+    const tax_paid_avg = calc_avg(tax_paid);
+    const contribution_avg = calc_avg(contribution);
+    const expense_avg = calc_avg(expense);
 
     const years = Array.from(Array(gross_income_avg.length).keys())
     const after_tax_avg = zip(gross_income_avg, tax_paid_avg, contribution_avg, expense_avg)
@@ -57,16 +76,33 @@ export const ModelResults = (props) => {
 
     return (
       <ComponentWrapper>
-        <RowWrapper>
-          <NumberWithTitle
-            title={ 'Avg Value' }
-            number={ strConverter(avg) } />
-        </RowWrapper>
+        <InfoHeader
+          runs={runs}
+          results={results}
+          total_end_value={total_end_value} />
+        <YearlyTable
+          runs={runs}
+          years={years}
+          gross_income={gross_income}
+          net_income={net_income}
+          expense={expense}
+          tax_paid={tax_paid}
+          contribution={contribution} 
+          returns={returns} 
+          values={investment_values} 
+          dates={investment_dates} />
+        <DefaultHorizontalSpacer>
+          <Text light>Distribution of monthly returns across all simulations</Text>
+          <HistogramChart
+            runs={ 50 }
+            rootId={ 'chart-container-histogram' }
+            values={ returns.flat() } />
+        </DefaultHorizontalSpacer>
         <DefaultHorizontalSpacer>
           <Text light>Distribution of total value at simulation end</Text>
           <HistogramChart
             runs={ runs }
-            rootId={ 'chart-container-histogram' }
+            rootId={ 'all-returns-container-histogram' }
             values={ total_end_value } />
         </DefaultHorizontalSpacer>
         <DefaultHorizontalSpacer>

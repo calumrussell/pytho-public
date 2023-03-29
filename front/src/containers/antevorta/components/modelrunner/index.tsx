@@ -31,6 +31,7 @@ import {
 } from "@Api/index";
 
 import {
+  useAntevorta,
   useAntevortaDispatch,
 } from '../../context';
 import { AxiosError } from "axios";
@@ -52,6 +53,7 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
   }
 
   const userState = useUser();
+  const antevortaState = useAntevorta();
   const antevortaDispatch = useAntevortaDispatch();
 
   const [runs, setRuns] = useState(5);
@@ -77,6 +79,10 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
   const clickButton = (
     ev: React.MouseEvent<HTMLButtonElement>) => {
       ev.preventDefault();
+
+      if (antevortaState.results) {
+        antevortaDispatch({type: 'clearResults'})
+      }
 
       const runnerInput = {
         sim_config: userState.plans[selectedPlanPos].plan,

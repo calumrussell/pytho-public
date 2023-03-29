@@ -1,14 +1,21 @@
 import { AxiosError } from 'axios';
 
-import { PortfolioTypes } from '@Common/index';
-
 import { request } from './request';
 
 export interface AphroditeRequestInput {
-  portfolio: PortfolioTypes.Portfolio,
+  assets: Array<number>,
+  weights: Array<number>,
 }
 
-export interface AphroditeRequestOutput {}
+export interface AphroditeRequestOutput {
+  cagr: number,
+  dates: Array<number>,
+  mdd: number,
+  ret: number,
+  sharpe: number,
+  values: Array<number>,
+  vol: number,
+}
 
 export const aphroditeRequest = (input: AphroditeRequestInput, successFunc: (res: AphroditeRequestOutput) => void, errFunc: (err: AxiosError) => void, finallyFunc: () => void) => {
   request(`/backtest`)

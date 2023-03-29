@@ -9,7 +9,14 @@ export interface AthenaRequestInput {
   dependent: AthenaTypes.Security,
 }
 
-export interface AthenaRequestOutput {}
+export interface AthenaRequestOutput {
+  ind: Array<number>,
+  dep: number,
+  max_date: number,
+  min_date: number,
+  core: AthenaTypes.CoreResult,
+  rolling: AthenaTypes.RollingResult,
+}
 
 export const athenaCoreRequest = (input: AthenaRequestInput, successFunc: (res: AthenaRequestOutput) => void, errFunc: (err: AxiosError) => void, finallyFunc: () => void ) => {
   const {

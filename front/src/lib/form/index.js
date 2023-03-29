@@ -21,6 +21,7 @@ FormSelect.propTypes = {
   options: PropTypes.oneOfType([
     PropTypes.arrayOf(PropTypes.element),
     PropTypes.arrayOf(PropTypes.string),
+    PropTypes.arrayOf(PropTypes.number),
     PropTypes.string,
   ]).isRequired,
   value: PropTypes.any.isRequired,

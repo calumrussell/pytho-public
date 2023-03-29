@@ -8,9 +8,8 @@ export const histogram = (chartState, xAxis) => {
     runs,
   } = chartState.data;
 
-  const sturgeRule = (n) => Math.round(1 + (3.322 * Math.log10(n)));
   return bin()
       .value(xGetter)
       .domain(xAxis.domain())
-      .thresholds(xAxis.ticks(sturgeRule(runs)));
+      .thresholds(xAxis.ticks(runs));
 };

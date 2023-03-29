@@ -20,6 +20,9 @@ const Overlay = styled.div`
   display: flex;
   justify-content: flex-start;
   position: absolute;
+  & td:not(:first-child) > p {
+    color: transparent;
+  }
 `;
 
 const Table = styled.table`
@@ -28,19 +31,22 @@ const Table = styled.table`
   display: block;
   width: 100%;
 `;
+
 const CellWrapper = styled.td`
   min-width: 75px
 `;
 
 const Cell = ({
-  value,
+  value, formattingFunc,
 }) => {
+
+  const formattedValue = formattingFunc ? formattingFunc(value) : value;
   return (
     <CellWrapper>
       <Text
         number
         small>
-        {value}
+        {formattedValue}
       </Text>
     </CellWrapper>
   );
@@ -48,6 +54,7 @@ const Cell = ({
 
 Cell.propTypes = {
   value: PropTypes.string.isRequired,
+  formattingFunc: PropTypes.func,
 };
 
 const FirstCell = styled.td`
@@ -59,7 +66,7 @@ const FirstCell = styled.td`
 `;
 
 export const Row = ({
-  values, title, isSubSection,
+  values, title, isSubSection, formattingFunc,
 }) => {
   return (
     <tr>
@@ -79,6 +86,7 @@ export const Row = ({
       </FirstCell>
       {
         values && values.map((r, i) => <Cell
+          formattingFunc={formattingFunc}
           key={ i }
           value={ r } />)
       }
@@ -87,14 +95,14 @@ export const Row = ({
 };
 
 Row.propTypes = {
-  values: PropTypes.arrayOf(PropTypes.string),
-  title: PropTypes.string,
+  values: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])).isRequired,
+  title: PropTypes.string.isRequired,
   isSubSection: PropTypes.bool,
+  formattingFunc: PropTypes.func,
 };
 
-
 export const ScrollableTable = ({
-  headerRows, bodyRows, overlayHeader, overlayBody,
+  headerRows, bodyRows,
 }) => {
   return (
     <TableWrapper>
@@ -112,10 +120,10 @@ export const ScrollableTable = ({
       <Overlay>
         <table>
           <thead>
-            {overlayHeader}
+            {headerRows}
           </thead>
           <tbody>
-            {overlayBody}
+            {bodyRows}
           </tbody>
         </table>
       </Overlay>
@@ -126,6 +134,4 @@ export const ScrollableTable = ({
 ScrollableTable.propTypes = {
   headerRows: PropTypes.arrayOf(PropTypes.node).isRequired,
   bodyRows: PropTypes.arrayOf(PropTypes.node).isRequired,
-  overlayHeader: PropTypes.arrayOf(PropTypes.node).isRequired,
-  overlayBody: PropTypes.arrayOf(PropTypes.node).isRequired,
 };
