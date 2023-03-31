@@ -79,5 +79,7 @@ fn sim_test() {
         sim.update();
     }
 
-    let _perf = UKSimulationOutput::get_output(&sim);
+    let perf = UKSimulationOutput::get_output(&sim);
+    dbg!(&perf);
+    assert!(true == false);
 }

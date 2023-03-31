@@ -82,6 +82,7 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub net_income_annual: CashValue,
     pub expense_annual: CashValue,
     pub tax_paid_annual: CashValue,
+    //This isn't used for reporting, this is used in tax calculations
     pub tax_paid_paye_annual: CashValue,
     pub non_paye_income_annual: CashValue,
     pub paye_income_annual: CashValue,
@@ -103,28 +104,12 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub gross_income: Vec<CashValue>,
     pub net_income: Vec<CashValue>,
     pub expense: Vec<CashValue>,
+    //includes paye
     pub tax_paid: Vec<CashValue>,
     pub sipp_contributions: Vec<CashValue>,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
-    fn clear_annual(&mut self) {
-        let curr_date = self.clock.borrow().now();
-        if self.annual_tax_schedule.check(&curr_date) {
-            self.gross_income_annual = CashValue::from(0.0);
-            self.net_income_annual = CashValue::from(0.0);
-            self.expense_annual = CashValue::from(0.0);
-            self.tax_paid_annual = CashValue::from(0.0);
-            self.non_paye_income_annual = CashValue::from(0.0);
-            self.paye_income_annual = CashValue::from(0.0);
-            self.savings_income_annual = CashValue::from(0.0);
-            self.rental_income_annual = CashValue::from(0.0);
-            self.self_employment_income_annual = CashValue::from(0.0);
-            self.sipp_contributions_annual = CashValue::from(0.0);
-            self.tax_paid_paye_annual = CashValue::from(0.0);
-        }
-    }
-
     fn clear_loop(&mut self) {
         self.income_paid_in_curr_loop = CashValue::from(0.0);
     }
@@ -183,11 +168,10 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
         }
     }
 
+    // Tracker is only updated monthly on the performance schedule
     fn update_tracker(&mut self) {
         let curr_date = self.clock.borrow().now();
 
-        // `StrategySnapshot` for accounts are updated monthly. Annual variables are updated
-        // annually, and once updated they are cleared.
         if self.perf_schedule.check(&curr_date) {
             let trailing_month_inflation = self.source.get_trailing_month_inflation();
 
@@ -214,19 +198,38 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             self.sipp_snapshot.push(sipp_snapshot);
             self.cash.push(self.bank.balance.clone());
         }
+    }
 
-        if self.annual_tax_schedule.check(&curr_date) {
-            self.gross_income
-                .push(self.gross_income_annual.clone());
-            self.net_income.push(self.net_income_annual.clone());
-            self.expense.push(self.expense_annual.clone());
-            self.tax_paid.push(self.tax_paid_annual.clone());
-            self.sipp_contributions
-                .push(self.sipp_contributions_annual.clone());
+    // Updates on the same frequency as taxes, and should only be called by code
+    // that runs taxes. There are some nasty and obscure cycles that can be triggered
+    // if the taxation payment, the annual perf update, and the monthly perf update
+    // aren't ordered properly because it can lead to erroneous perf numbers if the
+    // taxation payments trigger orders (i.e. if the tax payment is greater than the cash
+    // balance which happens for non-paye income).
+    // We don't check the date here because this should only be called by taxation paying
+    // code that has already performed this check.
+    fn clear_annual(&mut self) {
+        self.gross_income
+            .push(self.gross_income_annual.clone());
+        self.net_income.push(self.net_income_annual.clone());
+        self.expense.push(self.expense_annual.clone());
+        //This is confusing but we don't need to PAYE here
+        self.tax_paid.push(self.tax_paid_annual.clone());
+        self.sipp_contributions
+            .push(self.sipp_contributions_annual.clone());
 
-            //Resets all the state tracker over the year to zero
-            self.clear_annual();
-        }
+        //Reset the annual trackers to zero
+        self.gross_income_annual = CashValue::from(0.0);
+        self.net_income_annual = CashValue::from(0.0);
+        self.expense_annual = CashValue::from(0.0);
+        self.tax_paid_annual = CashValue::from(0.0);
+        self.non_paye_income_annual = CashValue::from(0.0);
+        self.paye_income_annual = CashValue::from(0.0);
+        self.savings_income_annual = CashValue::from(0.0);
+        self.rental_income_annual = CashValue::from(0.0);
+        self.self_employment_income_annual = CashValue::from(0.0);
+        self.sipp_contributions_annual = CashValue::from(0.0);
+        self.tax_paid_paye_annual = CashValue::from(0.0);
     }
 
     fn rebalance_cash(&mut self) {
@@ -296,11 +299,13 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.isa.zero();
                     self.sipp.zero();
                     self.bank.zero();
+                    self.clear_annual();
                 } else if *self.isa.liquidation_value() > *tax_due {
                     self.isa.liquidate(&tax_due);
                     self.paid_into_isa_since_start =
                         CashValue::from(*self.paid_into_isa_since_start - *tax_due);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
+                    self.clear_annual();
                 } else {
                     let isa_value = self.isa.liquidation_value();
                     self.isa.liquidate(&isa_value);
@@ -311,9 +316,11 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                     self.paid_into_gia_since_start =
                         CashValue::from(*self.paid_into_gia_since_start - remainder);
                     self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
+                    self.clear_annual();
                 }
             } else {
                 self.tax_paid_annual = self.tax_paid_annual.clone() + tax_due;
+                self.clear_annual();
             }
         }
     }
