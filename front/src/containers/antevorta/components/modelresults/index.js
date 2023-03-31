@@ -84,17 +84,6 @@ export const ModelResults = (props) => {
           sample_start={sample_start}
           results={results}
           total_end_value={total_end_value} />
-        <YearlyTable
-          runs={runs}
-          years={years}
-          gross_income={gross_income}
-          net_income={net_income}
-          expense={expense}
-          tax_paid={tax_paid}
-          contribution={contribution} 
-          returns={returns} 
-          values={investment_values} 
-          dates={investment_dates} />
         <DefaultHorizontalSpacer>
           <Text light>Distribution of monthly returns across all simulations</Text>
           <HistogramChart
@@ -117,6 +106,17 @@ export const ModelResults = (props) => {
             rootId={ 'chart-container-gross-income' }
             yValues={ data } />
         </DefaultHorizontalSpacer>
+        <YearlyTable
+          runs={runs}
+          years={years}
+          gross_income={gross_income}
+          net_income={net_income}
+          expense={expense}
+          tax_paid={tax_paid}
+          contribution={contribution} 
+          returns={returns} 
+          values={investment_values} 
+          dates={investment_dates} />
       </ComponentWrapper>
     );
   } else {

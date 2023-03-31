@@ -6,7 +6,7 @@ const api_1 = require("../api");
 const error_1 = require("./error");
 ;
 const handler = (fastify) => async (request, reply) => {
-    const { weights, assets, sim_length, runs, sim_config, inflation_mu, inflation_var, } = request.body;
+    const { weights, assets, sim_length, runs, sim_config, inflation_mu, inflation_var, start_date, } = request.body;
     try {
         const assetIssuers = await api_1.Issuer.getIssuers(fastify, assets);
         if (assetIssuers._tag === "None") {
@@ -30,7 +30,7 @@ const handler = (fastify) => async (request, reply) => {
             config: sim_config,
             inflation_mu,
             inflation_var,
-            start_date: 1680283254,
+            start_date,
         };
         let res = { data: (0, panacea_1.antevorta)(input) };
         return reply.send(res);

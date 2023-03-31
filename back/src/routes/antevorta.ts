@@ -25,6 +25,7 @@ interface AntevortaRequestBody {
   sim_config: string,
   inflation_mu: number,
   inflation_var: number,
+  start_date: number,
 };
 
 type AntevortaRequest = FastifyRequest<{
@@ -40,6 +41,7 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
     sim_config,
     inflation_mu,
     inflation_var,
+    start_date,
   } = request.body;
   
   try {
@@ -67,7 +69,7 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
       config: sim_config,
       inflation_mu,
       inflation_var,
-      start_date: 1680283254,
+      start_date,
     };
 
     let res = { data: antevorta(input) };

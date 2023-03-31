@@ -60,6 +60,8 @@ export const InfoHeader = ({results, total_end_value, runs, sample_end, sample_s
         <NumberWithTitle
           title={'Sim End'}
           number={dateConverter(data_last_date)} />
+      </RowWrapper>
+      <RowWrapper>
         <NumberWithTitle
           title={'Sample Start'}
           number={dateConverter(sample_start)} />

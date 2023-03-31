@@ -6,12 +6,15 @@ import { request } from './request';
 
 export interface AntevortaRequestInput {
   runs: number,
+  //This is converted to JSON string before we send request
   sim_config: AntevortaTypes.FinancialPlan,
   sim_length: number,
   assets: Array<number>,
   weights: Array<number>
   inflation_mu: number,
   inflation_var: number,
+  //This is converted to epoch before we send request
+  start_date: string,
 }
 
 export interface AntevortaStandardSimulationOutput {
@@ -76,9 +79,11 @@ export const antevortaRequest = (input: AntevortaRequestInput, successFunc: (res
     .then(() => {
       //convert sim_config property to string
       let sim_config_str = JSON.stringify(input.sim_config);
+      //Default JS impl is to miliseconds so we need to divide down to get seconds
+      let start_date = new Date(input.start_date).getTime() /1000;
 
       request(`/incomesim`)
-        .post({ ...input, sim_config: sim_config_str })
+        .post({ ...input, sim_config: sim_config_str, start_date })
         .then((res) => res.data)
         .then((res) => successFunc({runs: input.runs, sim_length: input.sim_length, ...res.data}))
         .catch(errFunc)

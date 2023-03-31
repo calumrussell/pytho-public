@@ -61,6 +61,7 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
   const [inflationMu, setInflationMu] = useState(2);
   const [inflationVar, setInflationVar] = useState(2);
   const [disabledState, setDisabledState] = useState(false);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0])
 
   const {
     errorMessage,
@@ -76,6 +77,11 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
       setFunc(Number(ev.target.value));
   };
 
+  const startDateUpdater = (ev: React.ChangeEvent<HTMLInputElement>) => {
+    ev.preventDefault();
+    setStartDate(ev.target.value);
+  }
+
   const clickButton = (
     ev: React.MouseEvent<HTMLButtonElement>) => {
       ev.preventDefault();
@@ -90,6 +96,7 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
         sim_length: simLength,
         inflation_mu: inflationMu / 100.0,
         inflation_var: inflationVar / 100.0,
+        start_date: startDate,
         ...jsonPortfolio(userState.portfolio),
       };
 
@@ -163,7 +170,7 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
               onChange={ 
                 (ev: React.ChangeEvent<HTMLInputElement>) => 
                   inputWrapper(ev, setInflationMu ) } />
-              <FormLabel
+            <FormLabel
               htmlFor="antevorta-inflationvar-input">
               <Text light>Annual inflation variance</Text>
             </FormLabel>
@@ -178,6 +185,17 @@ export const ModelRunner = ({selectedPlanPos}: ModelInputProps) => {
               onChange={ 
                 (ev: React.ChangeEvent<HTMLInputElement>) => 
                   inputWrapper(ev, setInflationVar) } />
+            <FormLabel
+              htmlFor="antevorta-startdate-input">
+              <Text light>Start Date</Text>
+            </FormLabel>
+            <FormInput
+              id="antevorta-startdate-input"
+              type="date"
+              min={new Date().toISOString().split("T")[0]}
+              value={startDate}
+              name="startDate"
+              onChange={ startDateUpdater } />
           </FormWrapper>
         </DefaultHorizontalSpacer>
         <Title>Build Portfolio</Title>
