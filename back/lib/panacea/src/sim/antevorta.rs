@@ -7,7 +7,7 @@ use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
 use antevorta::country::uk::Config;
 use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
-use antevorta::output::{StandardSimulationOutput, ProducesStandardSimulationOutput};
+use antevorta::output::UKSimulationOutput;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 use serde::{Deserialize, Serialize};
@@ -70,11 +70,14 @@ pub struct EodRawAntevortaInput {
     pub config: String,
     pub inflation_mu: f64,
     pub inflation_var: f64,
+    pub start_date: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AntevortaResults {
-    pub results: Vec<StandardSimulationOutput>,
+    pub results: Vec<UKSimulationOutput>,
+    pub sample_start: i64,
+    pub sample_end: i64,
 }
 
 pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResults, Box<dyn Error>> {
@@ -83,12 +86,12 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
     let close = build_price_input_from_raw_close_prices(&input.close, &input.assets, &string_dates);
 
     let mut results = Vec::new();
-
     for _i in 0..input.runs {
-        let start_date = epoch_dates.first().unwrap().clone();
         let sim_length_in_days = (input.sim_length * 365) as i64;
 
-        let clock = ClockBuilder::with_length_in_days(start_date, sim_length_in_days - 1)
+        //Start date of the simulation is provided by the user, date shouldn't be overlapping with
+        //sample dates in data
+        let clock = ClockBuilder::with_length_in_days(input.start_date, sim_length_in_days - 1)
             .with_frequency(&alator::types::Frequency::Daily)
             .build();
 
@@ -145,9 +148,15 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
             sim.update();
             clock.borrow_mut().tick();
         }
-        results.push(sim.get_tracker().get_output());
+        results.push(UKSimulationOutput::get_output(&sim));
     }
-    Ok(AntevortaResults { results })
+    Ok(
+        AntevortaResults { 
+            results,
+            sample_start: epoch_dates.first().unwrap().clone(),
+            sample_end: epoch_dates.last().unwrap().clone(),
+        }
+    )
 }
 
 #[cfg(test)]
@@ -204,7 +213,8 @@ mod tests {
                 "contribution_pct":0.05,
                 "emergency_cash_min":1000,
                 "starting_cash":5000,
-                "lifetime_pension_contributions":0
+                "lifetime_pension_contributions":0,
+                "start_date": 1680283254
             }
         "#;
 
@@ -220,6 +230,7 @@ mod tests {
             weights,
             inflation_mu: 0.02,
             inflation_var: 0.001,
+            start_date: 1680283254,
         }
     }
 
@@ -284,6 +295,7 @@ mod tests {
             weights: HashMap::new(),
             inflation_mu: 0.02,
             inflation_var: 0.01,
+            start_date: 1680283254,
         };
 
         //This function is called at the start of simulation run to find date intersection

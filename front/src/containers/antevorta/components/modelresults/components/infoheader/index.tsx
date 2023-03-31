@@ -14,6 +14,8 @@ interface InfoHeaderProps {
   runs: number,
   results: Array<AntevortaStandardSimulationOutput>,
   total_end_value: Array<number>,
+  sample_start: number,
+  sample_end: number,
 }
 
 const RowWrapper = styled.div`
@@ -22,7 +24,7 @@ const RowWrapper = styled.div`
   margin: 1rem 0;
 `;
 
-export const InfoHeader = ({results, total_end_value, runs}: InfoHeaderProps) => {
+export const InfoHeader = ({results, total_end_value, runs, sample_end, sample_start}: InfoHeaderProps) => {
   const mdds = results.map(r => r.mdd);
   const avg_mdd = mdds.reduce((acc, curr) => acc+curr, 0) / mdds.length;
   //Have to flip these around because mdd is negative
@@ -53,11 +55,17 @@ export const InfoHeader = ({results, total_end_value, runs}: InfoHeaderProps) =>
     <React.Fragment>
       <RowWrapper>
         <NumberWithTitle
-          title={'Sample Start'}
+          title={'Sim Start'}
           number={dateConverter(data_first_date)} />
         <NumberWithTitle
-          title={'Sample End'}
+          title={'Sim End'}
           number={dateConverter(data_last_date)} />
+        <NumberWithTitle
+          title={'Sample Start'}
+          number={dateConverter(sample_start)} />
+        <NumberWithTitle
+          title={'Sample End'}
+          number={dateConverter(sample_end)} />
       </RowWrapper>
       <RowWrapper>
         <NumberWithTitle

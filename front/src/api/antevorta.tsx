@@ -43,6 +43,8 @@ export interface AntevortaRequestOutput {
   runs: number,
   sim_length: number,
   results: Array<AntevortaStandardSimulationOutput>,
+  sample_start: number,
+  sample_end: number,
 }
 
 // Before we send this to server, we perform some error-checking. This is

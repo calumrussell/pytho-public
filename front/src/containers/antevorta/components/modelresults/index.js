@@ -34,6 +34,8 @@ export const ModelResults = (props) => {
     const {
       runs,
       results,
+      sample_start,
+      sample_end,
     } = state.results;
 
     const gross_income = new Array();
@@ -78,6 +80,8 @@ export const ModelResults = (props) => {
       <ComponentWrapper>
         <InfoHeader
           runs={runs}
+          sample_end={sample_end}
+          sample_start={sample_start}
           results={results}
           total_end_value={total_end_value} />
         <YearlyTable
@@ -101,7 +105,7 @@ export const ModelResults = (props) => {
         <DefaultHorizontalSpacer>
           <Text light>Distribution of total value at simulation end</Text>
           <HistogramChart
-            runs={ runs }
+            runs={ Math.min(5, runs/4) }
             rootId={ 'all-returns-container-histogram' }
             values={ total_end_value } />
         </DefaultHorizontalSpacer>

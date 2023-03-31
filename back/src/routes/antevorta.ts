@@ -13,6 +13,8 @@ interface AntevortaInput {
   config: string,
   inflation_mu: number,
   inflation_var: number,
+  //This is created on the server if the user doesn't pass a date
+  start_date: number,
 }
 
 interface AntevortaRequestBody {
@@ -65,6 +67,7 @@ export const handler = (fastify: FastifyInstance) => async (request: AntevortaRe
       config: sim_config,
       inflation_mu,
       inflation_var,
+      start_date: 1680283254,
     };
 
     let res = { data: antevorta(input) };
@@ -123,6 +126,12 @@ const responseSchema = {
       data: {
         type: 'object',
         properties: {
+          sample_start: {
+            type: 'number'
+          },
+          sample_end: {
+            type: 'number'
+          },
           results: {
             type: 'array',
             items: {

@@ -3,6 +3,7 @@ use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
 use antevorta::input::build_hashmapsource_random;
+use antevorta::output::UKSimulationOutput;
 use std::rc::Rc;
 
 use antevorta::country::uk::Config;
@@ -73,5 +74,5 @@ fn sim_result_test() {
         clock.borrow_mut().tick();
         sim.update();
     }
-    assert!(*sim.get_tracker().get_final_value() > 40_000.0);
+    assert!(*UKSimulationOutput::get_final_value(&sim) > 40_000.0);
 }

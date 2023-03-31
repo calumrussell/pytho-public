@@ -5,7 +5,7 @@ mod tax;
 use self::tax::UKTaxInput;
 pub use self::tax::NIC;
 
-use alator::perf::{BacktestOutput, PerformanceCalculator};
+use alator::perf::BacktestOutput;
 use alator::types::DateTime;
 use alator::types::StrategySnapshot;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,6 @@ use crate::acc::TransferResult;
 use crate::country::uk::stack::BankAcc;
 use crate::input::HashMapSourceSim;
 use crate::input::SimDataSource;
-use crate::output::{ProducesStandardSimulationOutput, StandardSimulationOutput};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
@@ -29,93 +28,6 @@ use flow::{Employment, EmploymentPAYE, Expense, PctOfIncomeExpense, Rental};
 use stack::Mortgage;
 use stack::{Gia, Isa, Sipp, Stack};
 use tax::{TaxPeriod, UKTaxConfig};
-
-///Tracks the performance of values across the simulation on an annual basis. This is meant to
-///integrate into the performance calculation code in alator.
-///Intention is that this data is returned to clients at the end of the simulation.
-#[derive(Clone, Debug)]
-pub struct UKSimulationPerformanceTracker {
-    isa_snapshot: Vec<StrategySnapshot>,
-    sipp_snapshot: Vec<StrategySnapshot>,
-    gia_snapshot: Vec<StrategySnapshot>,
-    cash: Vec<CashValue>,
-    gross_income: Vec<CashValue>,
-    net_income: Vec<CashValue>,
-    expense: Vec<CashValue>,
-    tax_paid: Vec<CashValue>,
-    sipp_contributions: Vec<CashValue>,
-}
-
-impl UKSimulationPerformanceTracker {
-    fn init() -> Self {
-        Self {
-            isa_snapshot: Vec::new(),
-            sipp_snapshot: Vec::new(),
-            gia_snapshot: Vec::new(),
-            cash: Vec::new(),
-            gross_income: Vec::new(),
-            net_income: Vec::new(),
-            expense: Vec::new(),
-            tax_paid: Vec::new(),
-            sipp_contributions: Vec::new(),
-        }
-    }
-
-    pub fn get_final_value(&self) -> CashValue {
-        let total_value = *self.isa_snapshot.last().unwrap().portfolio_value
-            + *self.gia_snapshot.last().unwrap().portfolio_value
-            + *self.sipp_snapshot.last().unwrap().portfolio_value
-            + **self.cash.last().unwrap();
-        CashValue::from(total_value)
-    }
-}
-
-impl ProducesStandardSimulationOutput for UKSimulationPerformanceTracker {
-    fn get_output(&self) -> StandardSimulationOutput {
-        let mut joined_snaps = Vec::new();
-        for (isa, sipp, gia ) in self.isa_snapshot.iter().zip(self.gia_snapshot.iter()).zip(self.sipp_snapshot.iter()).map(|((x, y), z)| (x, y, z)) {
-            let date = isa.date.clone();
-            //Should be the same across account types
-            let inflation = isa.inflation;
-
-            let value = CashValue::from(&*isa.portfolio_value + &*sipp.portfolio_value + &*gia.portfolio_value);
-            let net_cash_flow = CashValue::from(&*isa.net_cash_flow + &*sipp.net_cash_flow + &*gia.net_cash_flow);
-
-            joined_snaps.push(StrategySnapshot {
-                date,
-                inflation,
-                portfolio_value: value,
-                net_cash_flow
-            });
-        }
-        let perf = PerformanceCalculator::calculate(alator::types::Frequency::Monthly, joined_snaps);
-
-        StandardSimulationOutput {
-            returns_dates: perf.dates,
-            returns: perf.returns,
-            ret: perf.ret,
-            cagr: perf.cagr,
-            vol: perf.vol,
-            mdd: perf.mdd,
-            investment_cash_flows: perf.cash_flows,
-            sharpe: perf.sharpe,
-            values: perf.values,
-            first_date: perf.first_date,
-            last_date: perf.last_date,
-            best_return: perf.best_return,
-            worst_return: perf.worst_return,
-            frequency: perf.frequency,
-            dd_end_date: perf.dd_end_date,
-            dd_start_date: perf.dd_start_date,
-            gross_income: self.gross_income.iter().map(|v| **v).collect(),
-            net_income: self.net_income.iter().map(|v| **v).collect(),
-            cash: self.cash.iter().map(|v| **v).collect(),
-            expense: self.expense.iter().map(|v| **v).collect(),
-            tax_paid: self.tax_paid.iter().map(|v| **v).collect(),
-            sipp_contributions: self.sipp_contributions.iter().map(|v| **v).collect(),
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct UKSimulationPerformanceAnnualFrame {
@@ -183,8 +95,16 @@ pub struct UKSimulationState<S: InvestmentStrategy> {
     pub paid_into_isa_since_start: CashValue,
     pub paid_into_gia_since_start: CashValue,
     pub paid_into_sipp_since_start: CashValue,
-
-    pub tracker: UKSimulationPerformanceTracker,
+    //Tracker
+    pub isa_snapshot: Vec<StrategySnapshot>,
+    pub sipp_snapshot: Vec<StrategySnapshot>,
+    pub gia_snapshot: Vec<StrategySnapshot>,
+    pub cash: Vec<CashValue>,
+    pub gross_income: Vec<CashValue>,
+    pub net_income: Vec<CashValue>,
+    pub expense: Vec<CashValue>,
+    pub tax_paid: Vec<CashValue>,
+    pub sipp_contributions: Vec<CashValue>,
 }
 
 impl<S: InvestmentStrategy> UKSimulationState<S> {
@@ -217,10 +137,6 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             + *self.sipp.liquidation_value()
             + *self.bank.balance;
         CashValue::from(total_value)
-    }
-
-    pub fn get_tracker(&self) -> UKSimulationPerformanceTracker {
-        self.tracker.clone()
     }
 
     pub fn update(&mut self) {
@@ -270,7 +186,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     fn update_tracker(&mut self) {
         let curr_date = self.clock.borrow().now();
 
-        // `StrategySnapshot` for accounts are updated monthly. Annual variables are updated 
+        // `StrategySnapshot` for accounts are updated monthly. Annual variables are updated
         // annually, and once updated they are cleared.
         if self.perf_schedule.check(&curr_date) {
             let trailing_month_inflation = self.source.get_trailing_month_inflation();
@@ -293,21 +209,19 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
                 net_cash_flow: self.paid_into_sipp_since_start.clone(),
                 inflation: trailing_month_inflation.clone(),
             };
-            self.tracker.isa_snapshot.push(isa_snapshot);
-            self.tracker.gia_snapshot.push(gia_snapshot);
-            self.tracker.sipp_snapshot.push(sipp_snapshot);
-            self.tracker.cash.push(self.bank.balance.clone());
+            self.isa_snapshot.push(isa_snapshot);
+            self.gia_snapshot.push(gia_snapshot);
+            self.sipp_snapshot.push(sipp_snapshot);
+            self.cash.push(self.bank.balance.clone());
         }
 
         if self.annual_tax_schedule.check(&curr_date) {
-            self.tracker
-                .gross_income
+            self.gross_income
                 .push(self.gross_income_annual.clone());
-            self.tracker.net_income.push(self.net_income_annual.clone());
-            self.tracker.expense.push(self.expense_annual.clone());
-            self.tracker.tax_paid.push(self.tax_paid_annual.clone());
-            self.tracker
-                .sipp_contributions
+            self.net_income.push(self.net_income_annual.clone());
+            self.expense.push(self.expense_annual.clone());
+            self.tax_paid.push(self.tax_paid_annual.clone());
+            self.sipp_contributions
                 .push(self.sipp_contributions_annual.clone());
 
             //Resets all the state tracker over the year to zero
@@ -326,7 +240,8 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
             //If we are over ISA deposit limit, invest what is possible then return the remainder
             //which can go into GIA
             let (deposited, remainder) = self.isa.deposit_wrapper(&excess_cash);
-            self.paid_into_isa_since_start = CashValue::from(*self.paid_into_isa_since_start + *deposited);
+            self.paid_into_isa_since_start =
+                CashValue::from(*self.paid_into_isa_since_start + *deposited);
             if *remainder > 0.0 {
                 self.paid_into_gia_since_start =
                     CashValue::from(*self.paid_into_gia_since_start + *remainder);
@@ -505,7 +420,15 @@ impl Config {
             paid_into_gia_since_start: 0.0.into(),
             paid_into_isa_since_start: 0.0.into(),
             paid_into_sipp_since_start: 0.0.into(),
-            tracker: UKSimulationPerformanceTracker::init(),
+            isa_snapshot: Vec::new(),
+            sipp_snapshot: Vec::new(),
+            gia_snapshot: Vec::new(),
+            cash: Vec::new(),
+            gross_income: Vec::new(),
+            net_income: Vec::new(),
+            expense: Vec::new(),
+            tax_paid: Vec::new(),
+            sipp_contributions: Vec::new(),
         }
     }
 

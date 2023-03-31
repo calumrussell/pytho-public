@@ -30,6 +30,7 @@ const handler = (fastify) => async (request, reply) => {
             config: sim_config,
             inflation_mu,
             inflation_var,
+            start_date: 1680283254,
         };
         let res = { data: (0, panacea_1.antevorta)(input) };
         return reply.send(res);
@@ -87,6 +88,12 @@ const responseSchema = {
             data: {
                 type: 'object',
                 properties: {
+                    sample_start: {
+                        type: 'number'
+                    },
+                    sample_end: {
+                        type: 'number'
+                    },
                     results: {
                         type: 'array',
                         items: {
