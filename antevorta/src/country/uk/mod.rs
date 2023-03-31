@@ -209,8 +209,7 @@ impl<S: InvestmentStrategy> UKSimulationState<S> {
     // We don't check the date here because this should only be called by taxation paying
     // code that has already performed this check.
     fn clear_annual(&mut self) {
-        self.gross_income
-            .push(self.gross_income_annual.clone());
+        self.gross_income.push(self.gross_income_annual.clone());
         self.net_income.push(self.net_income_annual.clone());
         self.expense.push(self.expense_annual.clone());
         //This is confusing but we don't need to PAYE here
