@@ -20,7 +20,7 @@ interface AntevortaInput {
 interface AntevortaRequestBody {
   assets: Array<number>,
   weights: Array<number>,
-  sim_length: number,
+  sim_length: number, 
   runs: number,
   sim_config: string,
   inflation_mu: number,

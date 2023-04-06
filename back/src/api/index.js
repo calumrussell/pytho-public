@@ -83,6 +83,56 @@ var User;
             return false;
         }
     };
+    User.insertFinancialPlanByUser = async (fastify, user_key, plan) => {
+        try {
+            const _res = await fastify.query(db_1.queryBuilder.insertFinancialPlanByUser(), [user_key, plan]);
+            return true;
+        }
+        catch (e) {
+            console.log(e);
+            return false;
+        }
+    };
+    User.getFinancialPlanByUser = async (fastify, user_key) => {
+        try {
+            const { rows } = await fastify.query(db_1.queryBuilder.getFinancialPlanByUser(), [user_key]);
+            if (rows.length === 0) {
+                return (0, common_1.none)();
+            }
+            else {
+                return (0, common_1.some)(rows);
+            }
+        }
+        catch (e) {
+            console.log(e);
+            return (0, common_1.none)();
+        }
+    };
+    User.insertPortfolioByUser = async (fastify, user_key, portfolio) => {
+        try {
+            const _res = await fastify.query(db_1.queryBuilder.insertPortfolioByUser(), [user_key, portfolio]);
+            return true;
+        }
+        catch (e) {
+            console.log(e);
+            return false;
+        }
+    };
+    User.getPortfolioByUser = async (fastify, user_key) => {
+        try {
+            const { rows } = await fastify.query(db_1.queryBuilder.getPortfolioByUser(), [user_key]);
+            if (rows.length === 0) {
+                return (0, common_1.none)();
+            }
+            else {
+                return (0, common_1.some)(rows);
+            }
+        }
+        catch (e) {
+            console.log(e);
+            return (0, common_1.none)();
+        }
+    };
 })(User = exports.User || (exports.User = {}));
 var Issuer;
 (function (Issuer) {

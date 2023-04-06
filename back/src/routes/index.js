@@ -11,8 +11,8 @@ const dataRoutes = (fastify, _opts, done) => {
     fastify.post('/backtest', { schema: alator_1.schema }, (0, alator_1.handler)(fastify));
     fastify.post('/incomesim', { schema: antevorta_1.schema }, (0, antevorta_1.handler)(fastify));
     fastify.get('/riskattribution', { schema: risk_1.schema }, (0, risk_1.handler)(fastify));
-    fastify.get('/create', (0, user_1.createHandler)(fastify));
-    fastify.post('/login', (0, user_1.loginHandler)(fastify));
+    fastify.get('/create', { schema: user_1.createSchema }, (0, user_1.createHandler)(fastify));
+    fastify.post('/login', { schema: user_1.loginSchema }, (0, user_1.loginHandler)(fastify));
     fastify.get('/logout', (0, user_1.logoutHandler)(fastify));
     done();
 };

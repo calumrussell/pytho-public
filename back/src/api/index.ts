@@ -68,6 +68,18 @@ export namespace User {
     user_key: string,
   };
 
+  export interface Portfolio {
+    id: number,
+    user_key: string,
+    portfolio: string,
+  }
+
+  export interface FinancialPlan {
+    id: number,
+    user_key: string,
+    plan: string,
+  }
+
   export const getUser = async (fastify: FastifyInstance, user_key: string): Promise<Option<Row>> => {
     try {
       const { rows } = await fastify.query(queryBuilder.getUser(), [user_key]);
@@ -92,6 +104,54 @@ export namespace User {
       return false;
     }
   };
+
+  export const insertFinancialPlanByUser = async (fastify: FastifyInstance, user_key: string, plan: string): Promise<boolean> => {
+    try {
+      const _res = await fastify.query(queryBuilder.insertFinancialPlanByUser(), [user_key, plan]);
+      return true;
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+  }
+
+  export const getFinancialPlanByUser = async (fastify: FastifyInstance, user_key: string): Promise<Option<Array<FinancialPlan>>> => {
+    try {
+      const { rows } = await fastify.query(queryBuilder.getFinancialPlanByUser(), [user_key]);
+      if (rows.length === 0) {
+        return none();
+      } else {
+        return some(rows);
+      }
+    } catch (e) {
+      console.log(e);
+      return none();
+    }
+  }
+
+  export const insertPortfolioByUser = async (fastify: FastifyInstance, user_key: string, portfolio: string): Promise<boolean> => {
+    try {
+      const _res = await fastify.query(queryBuilder.insertPortfolioByUser(), [user_key, portfolio]);
+      return true;
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+  }
+
+  export const getPortfolioByUser = async (fastify: FastifyInstance, user_key: string): Promise<Option<Array<Portfolio>>> => {
+    try {
+      const { rows } = await fastify.query(queryBuilder.getPortfolioByUser(), [user_key]);
+      if (rows.length === 0) {
+        return none();
+      } else {
+        return some(rows);
+      }
+    } catch (e) {
+      console.log(e);
+      return none();
+    }
+  }
 }
 
 export namespace Issuer {

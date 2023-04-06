@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 import fp from 'fastify-plugin';
 import { Pool } from 'pg';
+import { createContext } from "vm";
 
 const innerDB = (fastify: FastifyInstance, _opts: FastifyPluginOptions, done: (err?: Error) => void) => {
   //Uses env by default
@@ -33,12 +34,32 @@ const getUser = () => {
 const insertUser = () => {
   return "insert into api_user(user_key) values($1)";
 };
+        
+const insertPortfolioByUser = () => {
+  return "insert into api_userportfolio(user_key, portfolio) values($1, $2)";
+}
+
+const getPortfolioByUser = () => {
+  return "select * from api_userportfolio where user_key=$1";
+}
+
+const insertFinancialPlanByUser = () => {
+  return "insert into api_userfinancialplan(user_key, plan) values($1, $2)";
+}
+
+const getFinancialPlanByUser = () => {
+  return "select * from api_userfinancialplan where user_key=$1";
+}
 
 const queryBuilder = {
   suggestIssuer,
   getIssuer,
   getUser,
   insertUser,
+  insertPortfolioByUser,
+  getPortfolioByUser,
+  insertFinancialPlanByUser,
+  getFinancialPlanByUser,
 }
 
 export {
