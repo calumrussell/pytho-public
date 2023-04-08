@@ -4,11 +4,11 @@ export type { AntevortaRequestInput, AntevortaRequestOutput };
 
 export { antevortaRequest };
 
-import { checkUser, createUser, loginUser, logoutUser, LoginResponse } from "./user";
+import { checkUser, createUser, loginUser, logoutUser, LoginResponse, addPlan, addPortfolio, removePlan, removePortfolio } from "./user";
 
 export type { LoginResponse };
 
-export { checkUser, createUser, loginUser, logoutUser };
+export { checkUser, createUser, loginUser, logoutUser, addPlan, addPortfolio, removePlan, removePortfolio };
 
 import { aphroditeRequest, AphroditeRequestInput, AphroditeRequestOutput } from "./aphrodite";
 

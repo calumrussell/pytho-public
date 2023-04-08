@@ -13,7 +13,12 @@ const dataRoutes = (fastify, _opts, done) => {
     fastify.get('/riskattribution', { schema: risk_1.schema }, (0, risk_1.handler)(fastify));
     fastify.get('/create', { schema: user_1.createSchema }, (0, user_1.createHandler)(fastify));
     fastify.post('/login', { schema: user_1.loginSchema }, (0, user_1.loginHandler)(fastify));
-    fastify.get('/logout', (0, user_1.logoutHandler)(fastify));
+    fastify.get('/logout', { schema: user_1.logoutSchema }, (0, user_1.logoutHandler)(fastify));
+    fastify.delete('/portfolio', { schema: user_1.removePortfolioSchema }, (0, user_1.removePortfolioHandler)(fastify));
+    fastify.post('/portfolio', { schema: user_1.addPortfolioSchema }, (0, user_1.addPortfolioHandler)(fastify));
+    fastify.delete('/plan', { schema: user_1.removeFinancialPlanSchema }, (0, user_1.removeFinancialPlanHandler)(fastify));
+    fastify.post('/plan', { schema: user_1.addFinancialPlanSchema }, (0, user_1.addFinancialPlanHandler)(fastify));
+    fastify.get('/userstate', { schema: user_1.getUserStateSchema }, (0, user_1.getUserStateHandler)(fastify));
     done();
 };
 exports.dataRoutes = dataRoutes;

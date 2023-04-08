@@ -2,28 +2,23 @@ import React from "react";
 import styled from "styled-components";
 import zip from 'lodash.zip';
 
-import { DefaultHorizontalSpacer, Text, CancelIcon, PortfolioTypes } from "@Common/index";
+import { DefaultHorizontalSpacer, Text, CancelIcon, PortfolioTypes, DoubleHorizontalSpacer } from "@Common/index";
 import { useUser, useUserDispatch } from "@Components/reducers/user";
 
 const RowSpacer = styled(DefaultHorizontalSpacer)`
   display: flex;
   align-items: center;
-
-  > * {
-    &:first-child {
-      padding-right: 0.5rem;
-      cursor: pointer;
-    }
-    &:nth-child(2) {
-      padding-right: 0.5rem;
-    }
-  }
 `;
+
+const Wrapper = styled.div`
+  margin: 1rem 0rem;
+`
 
 export const PortfolioDisplay = () => {
 
   const userState = useUser();
   const userDispatch = useUserDispatch();
+
   const {
     assets,
     weights,
@@ -31,7 +26,7 @@ export const PortfolioDisplay = () => {
   } = userState.portfolio;
 
   const removeFunc = (idx: number) => {
-    userDispatch({ type: 'RMV_PORTFOLIO', idx });
+    userDispatch({ type: 'RMV_ASSET', idx });
   }
 
   if (isEmpty) {
@@ -40,7 +35,7 @@ export const PortfolioDisplay = () => {
     const zipped: [PortfolioTypes.Security | undefined,  number | undefined][] = zip<PortfolioTypes.Security, number>(assets, weights);
 
     return (
-      <>
+      <Wrapper>
       {
         zipped.map((data, idx) => {
           return (
@@ -48,10 +43,12 @@ export const PortfolioDisplay = () => {
               key={ idx }>
               <RowSpacer>
                 <CancelIcon
+                  style={{paddingRight: '0.25rem'}}
                   data-testid="backtest-removeassetbutton"
                   value={idx.toString()}
                   onClick={ () => removeFunc(idx) } />
                 <Text
+                  style={{paddingRight: '0.5rem'}}
                   small>
                   {`${data[1]} %`}
                 </Text>
@@ -63,7 +60,7 @@ export const PortfolioDisplay = () => {
           )
         })
       }
-      </>
+      </Wrapper>
     )
   }
 }

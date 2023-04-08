@@ -36,6 +36,8 @@ export const ThemisApp = (props) => {
     const successFunc = (res) => dispatch({
       type: 'LOGIN',
       userKey: res.userKey,
+      plans: [],
+      portfolios: [],
     })
 
     const errorFunc = (err) => {

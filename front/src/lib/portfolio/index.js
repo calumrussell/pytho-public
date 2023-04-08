@@ -10,10 +10,18 @@ import {
 import {
   PortfolioDisplay,
 } from './components/display';
+import {
+  PortfolioSaver,
+} from './components/saver';
+import {
+  PortfolioState,
+} from './components/state';
 
 export {
   PortfolioPerformance,
   PortfolioBuilder,
   PortfolioSearch,
   PortfolioDisplay,
+  PortfolioSaver,
+  PortfolioState,
 };

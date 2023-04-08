@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 import fp from 'fastify-plugin';
 import { Pool } from 'pg';
-import { createContext } from "vm";
 
 const innerDB = (fastify: FastifyInstance, _opts: FastifyPluginOptions, done: (err?: Error) => void) => {
   //Uses env by default
@@ -36,7 +35,7 @@ const insertUser = () => {
 };
         
 const insertPortfolioByUser = () => {
-  return "insert into api_userportfolio(user_key, portfolio) values($1, $2)";
+  return "insert into api_userportfolio(user_key, name, portfolio) values($1, $2, $3)";
 }
 
 const getPortfolioByUser = () => {
@@ -44,11 +43,19 @@ const getPortfolioByUser = () => {
 }
 
 const insertFinancialPlanByUser = () => {
-  return "insert into api_userfinancialplan(user_key, plan) values($1, $2)";
+  return "insert into api_userfinancialplan(user_key, name, plan) values($1, $2, $3)";
 }
 
 const getFinancialPlanByUser = () => {
   return "select * from api_userfinancialplan where user_key=$1";
+}
+
+const removeFinancialPlanByUser = () => {
+  return "delete from api_userfinancialplan where user_key=$1 and name=$2";
+}
+
+const removePortfolioByUser = () => {
+  return "delete from api_userportfolio where user_key=$1 and name=$2";
 }
 
 const queryBuilder = {
@@ -58,8 +65,10 @@ const queryBuilder = {
   insertUser,
   insertPortfolioByUser,
   getPortfolioByUser,
+  removePortfolioByUser,
   insertFinancialPlanByUser,
   getFinancialPlanByUser,
+  removeFinancialPlanByUser,
 }
 
 export {

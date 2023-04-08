@@ -1,3 +1,4 @@
+import { AntevortaTypes, PortfolioTypes } from '@Common/index';
 import axios, { AxiosError } from 'axios';
 
 export interface LoginResponse {
@@ -49,4 +50,58 @@ export const logoutUser = (successFunc: () => void, errFunc: (err: AxiosError) =
       .then((res) => res.data)
       .then(successFunc)
       .catch(errFunc);
+};
+
+export const addPortfolio = (userKey: string, name: string, portfolio: PortfolioTypes.Portfolio, successFunc: () => void, errFunc: (err: AxiosError) => void) =>{
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  const requestInput = {
+    'userKey': userKey,
+    'portfolio': JSON.stringify(portfolio),
+    'name': name,
+  };
+
+  axios.post(process.env.API_URL + '/portfolio', requestInput, {
+    headers: headers,
+  })
+      .then((res) => res.data)
+      .then(successFunc)
+      .catch(errFunc);
+};
+
+export const removePortfolio = (userKey: string, name: string, successFunc: () => void, errFunc: (err: AxiosError) => void) => {
+  axios.delete(process.env.API_URL + `/portfolio?userKey=${userKey}&name=${name}`)
+    .then((res) => res.data)
+    .then(successFunc)
+    .catch(errFunc);
+};
+
+export const addPlan = (userKey: string, name: string, plan: AntevortaTypes.FinancialPlan, successFunc: () => void, errFunc: (err: AxiosError) => void) =>{
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  const requestInput = {
+    'userKey': userKey,
+    'plan': JSON.stringify({name, plan}),
+    'name': name,
+  };
+
+  axios.post(process.env.API_URL + '/plan', requestInput, {
+    headers: headers,
+  })
+      .then((res) => res.data)
+      .then(successFunc)
+      .catch(errFunc);
+};
+
+export const removePlan = (userKey: string, name: string, successFunc: () => void, errFunc: (err: AxiosError) => void) => {
+  axios.delete(process.env.API_URL + `/plan?userKey=${userKey}&name=${name}`)
+    .then((res) => res.data)
+    .then(successFunc)
+    .catch(errFunc);
 };

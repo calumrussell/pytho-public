@@ -6,6 +6,8 @@ import {
 import {
   PortfolioBuilder,
   PortfolioDisplay,
+  PortfolioSaver,
+  PortfolioState,
 } from '@Components/portfolio';
 import {
   SectionWrapper, ComponentWrapper,
@@ -27,6 +29,8 @@ const Aphrodite = (props) => {
         <ComponentWrapper>
           <PortfolioBuilder />
           <PortfolioDisplay />
+          <PortfolioSaver />
+          <PortfolioState />
         </ComponentWrapper>
       </SectionWrapper>
       <SectionWrapper>

@@ -71,12 +71,14 @@ export namespace User {
   export interface Portfolio {
     id: number,
     user_key: string,
+    name: string,
     portfolio: string,
   }
 
   export interface FinancialPlan {
     id: number,
     user_key: string,
+    name: string,
     plan: string,
   }
 
@@ -105,9 +107,19 @@ export namespace User {
     }
   };
 
-  export const insertFinancialPlanByUser = async (fastify: FastifyInstance, user_key: string, plan: string): Promise<boolean> => {
+  export const insertFinancialPlanByUser = async (fastify: FastifyInstance, user_key: string, name: string, plan: string): Promise<boolean> => {
     try {
-      const _res = await fastify.query(queryBuilder.insertFinancialPlanByUser(), [user_key, plan]);
+      const _res = await fastify.query(queryBuilder.insertFinancialPlanByUser(), [user_key, name, plan]);
+      return true;
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+  }
+
+  export const removeFinancialPlanByUser = async (fastify: FastifyInstance, user_key: string, name: string): Promise<boolean> => {
+    try {
+      const _res = await fastify.query(queryBuilder.removeFinancialPlanByUser(), [user_key, name]);
       return true;
     } catch (e) {
       console.log(e);
@@ -129,9 +141,19 @@ export namespace User {
     }
   }
 
-  export const insertPortfolioByUser = async (fastify: FastifyInstance, user_key: string, portfolio: string): Promise<boolean> => {
+  export const insertPortfolioByUser = async (fastify: FastifyInstance, user_key: string, name: string, portfolio: string): Promise<boolean> => {
     try {
-      const _res = await fastify.query(queryBuilder.insertPortfolioByUser(), [user_key, portfolio]);
+      const _res = await fastify.query(queryBuilder.insertPortfolioByUser(), [user_key, name, portfolio]);
+      return true;
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+  }
+
+  export const removePortfolioByUser = async (fastify: FastifyInstance, user_key: string, name: string): Promise<boolean> => {
+    try {
+      const _res = await fastify.query(queryBuilder.removePortfolioByUser(), [user_key, name]);
       return true;
     } catch (e) {
       console.log(e);
@@ -142,6 +164,7 @@ export namespace User {
   export const getPortfolioByUser = async (fastify: FastifyInstance, user_key: string): Promise<Option<Array<Portfolio>>> => {
     try {
       const { rows } = await fastify.query(queryBuilder.getPortfolioByUser(), [user_key]);
+      console.log(rows);
       if (rows.length === 0) {
         return none();
       } else {

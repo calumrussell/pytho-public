@@ -16,7 +16,7 @@ import {
 import {
   useMessage
 } from '@Components/reducers/message';
-import { loginUser } from '@Api/user';
+import { loginUser } from '@Api/index';
 
 export const LoginForm = (props) => {
   const [
@@ -39,7 +39,7 @@ export const LoginForm = (props) => {
     ev.preventDefault();
 
     const successFunc = (res) => {
-      dispatch({ type: "LOGIN", userKey})
+      dispatch({ type: "LOGIN", userKey, plans: res.plans, portfolios: res.portfolios})
     }
 
     const errorFunc = (err) => {

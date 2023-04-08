@@ -3,22 +3,31 @@ import React, { createContext, useContext, useReducer } from 'react';
 import { AntevortaTypes, PortfolioTypes } from '@Common/index';
 
 type ACTIONTYPE =
-  | { type: 'LOGIN', userKey: string }
+  | { type: 'LOGIN'; userKey: string, plans: Array<FinancialPlanWrapper>, portfolios: Array<PortfolioWrapper> }
   | { type: 'LOGOUT' }
   | { type: 'ADD_PLAN'; plan: AntevortaTypes.FinancialPlan, name: string }
   | { type: 'RMV_PLAN'; pos: number }
   | { type: 'ADD_PORTFOLIO'; asset: PortfolioTypes.Security, weight: number}
+  | { type: 'RMV_ASSET'; idx: number }
   | { type: 'RMV_PORTFOLIO'; idx: number }
+  | { type: 'SAVE_PORTFOLIO'; name: string, portfolio: PortfolioTypes.Portfolio }
+  | { type: 'CLR_PORTFOLIO' }
 
 interface FinancialPlanWrapper {
   name: string,
   plan: AntevortaTypes.FinancialPlan,
 }
 
+interface PortfolioWrapper {
+  name: string,
+  portfolio: PortfolioTypes.Portfolio,
+}
+
 interface userState {
   isLoggedIn: boolean,
   user: string,
   plans: Array<FinancialPlanWrapper>,
+  portfolios: Array<PortfolioWrapper>,
   portfolio: PortfolioTypes.Portfolio,
 }
 
@@ -26,6 +35,7 @@ const initialState: userState = {
   isLoggedIn: false,
   user: "",
   plans: [],
+  portfolios: [],
   portfolio: {
     assets: [],
     weights: [],
@@ -38,20 +48,25 @@ const UserDispatchContext = createContext<React.Dispatch<ACTIONTYPE>>(() => {});
 
 const userReducer = (state: typeof initialState, action: ACTIONTYPE): typeof initialState => {
   switch(action.type) {
-    case 'LOGIN':
+    case 'LOGIN': {
       localStorage.setItem('userKey', action.userKey);
+
       return {
         ...state,
         isLoggedIn: true,
         user: action.userKey,
+        plans: action.plans,
+        portfolios: action.portfolios,
       }
-    case 'LOGOUT':
+    }
+    case 'LOGOUT': {
       localStorage.removeItem('userKey');
       return {
         ...state,
         isLoggedIn: false,
         user: "",
       }
+    }
     case 'ADD_PLAN': {
       const newPlan = {
         name: action.name,
@@ -98,7 +113,7 @@ const userReducer = (state: typeof initialState, action: ACTIONTYPE): typeof ini
         },
       };
     }
-    case 'RMV_PORTFOLIO':
+    case 'RMV_ASSET': {
       const copyAssets = [
         ...state.portfolio.assets,
       ];
@@ -117,6 +132,41 @@ const userReducer = (state: typeof initialState, action: ACTIONTYPE): typeof ini
           isEmpty,
         },
       };
+    }
+    case 'SAVE_PORTFOLIO': {
+      const wrapper = {
+        name: action.name,
+        portfolio: action.portfolio
+      };
+
+      const copy = [
+        wrapper,
+        ...state.portfolios,
+      ];
+
+      return {
+        ...state,
+        portfolios: copy,
+      };
+    }
+    case 'CLR_PORTFOLIO': {
+      return {
+        ...state,
+        portfolio: {
+          assets: [],
+          weights: [],
+          isEmpty: true,
+        }
+      };
+    }
+    case 'RMV_PORTFOLIO': {
+      const copy = [...state.portfolios];
+      copy.splice(action.idx, 1);
+      return {
+        ...state,
+        portfolios: copy,
+      }
+    }
   }
 }
 

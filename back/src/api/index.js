@@ -83,9 +83,19 @@ var User;
             return false;
         }
     };
-    User.insertFinancialPlanByUser = async (fastify, user_key, plan) => {
+    User.insertFinancialPlanByUser = async (fastify, user_key, name, plan) => {
         try {
-            const _res = await fastify.query(db_1.queryBuilder.insertFinancialPlanByUser(), [user_key, plan]);
+            const _res = await fastify.query(db_1.queryBuilder.insertFinancialPlanByUser(), [user_key, name, plan]);
+            return true;
+        }
+        catch (e) {
+            console.log(e);
+            return false;
+        }
+    };
+    User.removeFinancialPlanByUser = async (fastify, user_key, name) => {
+        try {
+            const _res = await fastify.query(db_1.queryBuilder.removeFinancialPlanByUser(), [user_key, name]);
             return true;
         }
         catch (e) {
@@ -108,9 +118,19 @@ var User;
             return (0, common_1.none)();
         }
     };
-    User.insertPortfolioByUser = async (fastify, user_key, portfolio) => {
+    User.insertPortfolioByUser = async (fastify, user_key, name, portfolio) => {
         try {
-            const _res = await fastify.query(db_1.queryBuilder.insertPortfolioByUser(), [user_key, portfolio]);
+            const _res = await fastify.query(db_1.queryBuilder.insertPortfolioByUser(), [user_key, name, portfolio]);
+            return true;
+        }
+        catch (e) {
+            console.log(e);
+            return false;
+        }
+    };
+    User.removePortfolioByUser = async (fastify, user_key, name) => {
+        try {
+            const _res = await fastify.query(db_1.queryBuilder.removePortfolioByUser(), [user_key, name]);
             return true;
         }
         catch (e) {
@@ -121,6 +141,7 @@ var User;
     User.getPortfolioByUser = async (fastify, user_key) => {
         try {
             const { rows } = await fastify.query(db_1.queryBuilder.getPortfolioByUser(), [user_key]);
+            console.log(rows);
             if (rows.length === 0) {
                 return (0, common_1.none)();
             }
