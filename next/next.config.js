@@ -4,6 +4,7 @@ const nextConfig = {
   compiler: {
     styledComponents: true,
   },
+  distDir: 'build',
   webpack: (config, options) => {
     config.experiments.asyncWebAssembly = true;
     config.module.rules.push({
