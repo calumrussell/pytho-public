@@ -22,9 +22,9 @@ import { Main } from "@Components/main";
 import { FormInput, FormLabel, FormWrapper } from "@Components/form";
 import { useMessage } from "@Components/reducers/message";
 
-import { Flow } from "./flow";
-import { Stack } from "./stack";
-import { reducer, initialState } from "./reducer";
+import { Flow } from "@Containers/plancreator/flow";
+import { Stack } from "@Containers/plancreator/stack";
+import { reducer, initialState } from "@Containers/plancreator/reducer";
 
 const RowWrapper = styled.div`
   display: flex;

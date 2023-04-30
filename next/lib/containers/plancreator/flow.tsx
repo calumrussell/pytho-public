@@ -15,7 +15,7 @@ import {
   AntevortaTypes,
 } from "@Common/index";
 
-import { ACTIONTYPE } from ".";
+import { ACTIONTYPE } from "@Containers/plancreator/reducer";
 
 interface FlowProps {
   dispatch: React.Dispatch<ACTIONTYPE>;

@@ -14,7 +14,7 @@ import { useMessage } from "@Components/reducers/message";
 import { withSessionSsr } from "@Root/lib/session";
 import { Main } from "@Components/main";
 
-import { LoginForm } from "./login";
+import { LoginForm } from "@Containers/user/login";
 
 const Inner = (props) => {
   const { userKey } = props;

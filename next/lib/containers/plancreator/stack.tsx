@@ -9,7 +9,7 @@ import {
 } from "@Components/form";
 import { ComponentWrapper, Text, Button, AntevortaTypes } from "@Common/index";
 
-import { ACTIONTYPE } from ".";
+import { ACTIONTYPE } from "@Containers/plancreator/reducer";
 
 interface StackProps {
   dispatch: React.Dispatch<ACTIONTYPE>;

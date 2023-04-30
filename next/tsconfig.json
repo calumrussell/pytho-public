@@ -17,6 +17,7 @@
     "paths": {
       "@Common/*": ["./lib/common/*"],
       "@Components/*": ["./lib/components/*"],
+      "@Containers/*": ["./lib/containers/*"],
       "@Root/*": ["./*"],
       "@/*": ["./src/*"]
     }

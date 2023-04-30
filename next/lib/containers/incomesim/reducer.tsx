@@ -106,12 +106,13 @@ export const parseAntevortaResults =
     const expense_avg = calc_avg(expense);
 
     const years = Array.from(Array(gross_income_avg.length).keys());
+
     const after_tax_avg = zip(
       gross_income_avg,
       tax_paid_avg,
       contribution_avg,
       expense_avg
-    ).map((v) => v[0] - v[1] - v[2] - v[3]);
+    ).map((v: any) => v[0] - v[1] - v[2] - v[3]);
 
     const averages = years.map((i) => ({
       net_income: after_tax_avg[i],

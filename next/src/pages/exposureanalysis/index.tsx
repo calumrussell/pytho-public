@@ -25,7 +25,7 @@ import { FormWrapper } from "@Components/form";
 import { PortfolioSearch } from "@Components/portfolio";
 import { LineChart } from "@Components/charts";
 
-import { reducer, initialState } from "./reducer";
+import { reducer, initialState } from "@Containers/exposureanalysis/reducer";
 
 interface FormattedCoreResults {
   coreCoefs: number[];

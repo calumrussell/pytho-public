@@ -30,9 +30,9 @@ import { useMessage } from "@Components/reducers/message";
 import { useLoader } from "@Components/reducers/loader";
 import { HistogramChart, StackedBarChart } from "@Components/charts";
 
-import { InfoHeader } from "./infoheader";
-import { YearlyTable } from "./yearlytable";
-import { initialState, reducer, convertStateToSnakeCase } from "./reducer";
+import { InfoHeader } from "@Containers/incomesim/infoheader";
+import { YearlyTable } from "@Containers/incomesim/yearlytable";
+import { initialState, reducer, convertStateToSnakeCase } from "@Containers/incomesim/reducer";
 
 interface IncomeSimProps {
   userKey: string | null;
@@ -272,6 +272,7 @@ export const Inner = ({ portfolios, plans }: IncomeSimProps) => {
             />
           </DefaultHorizontalSpacer>
           <YearlyTable
+            key={0}
             runs={state.runs}
             years={state.results.years}
             gross_income={state.results.gross_income}

@@ -6,13 +6,13 @@ import {
   strConverter,
   NumberWithTitle,
   strConverterMult,
+  AntevortaTypes,
 } from "@Common/index";
-import { AntevortaStandardSimulationOutput } from "@Api/antevorta";
 import { dateConverter } from "@Common/index";
 
 interface InfoHeaderProps {
   runs: number;
-  results: Array<AntevortaStandardSimulationOutput>;
+  results: Array<AntevortaTypes.AntevortaStandardSimulationOutput>;
   total_end_value: Array<number>;
   sample_start: number;
   sample_end: number;

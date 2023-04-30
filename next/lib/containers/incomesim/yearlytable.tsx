@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+
 import {
   DefaultHorizontalSpacer,
   Text,
@@ -7,7 +9,6 @@ import {
 } from "@Common/index";
 import { FormSelect, FormWrapper } from "@Components/form";
 import { Row, ScrollableTable } from "@Components/table";
-import React, { useState } from "react";
 
 interface YearlyTableProps {
   key: number;
