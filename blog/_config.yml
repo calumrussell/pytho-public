@@ -1,6 +1,0 @@
-title: Pytho blog
-description: A blog about investing
-baseurl: "/" 
-url: "https://pytho.uk"
-theme: minima
-permalink: /:slug:output_ext

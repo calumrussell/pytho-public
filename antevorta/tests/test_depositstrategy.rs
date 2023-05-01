@@ -4,8 +4,7 @@ use alator::exchange::DefaultExchangeBuilder;
 use alator::input::QuotesHashMap;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::input::FakeHashMapSourceSimWithQuotes;
-use antevorta::sim::SimRunner;
+use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -39,7 +38,8 @@ fn sim_depositstrategy() {
         );
     }
 
-    let src = FakeHashMapSourceSimWithQuotes::get(Rc::clone(&clock), fake_data);
+    let src =
+        build_hashmapsource_with_quotes_with_inflation(Rc::clone(&clock), fake_data, 0.0, 0.0);
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 1.0);
@@ -88,7 +88,7 @@ fn sim_depositstrategy() {
         ]
     }"#;
 
-    let sim = Config::parse(config)
+    let mut sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
     //The value of the bank account should be equal to the emergency fund balance
@@ -96,11 +96,9 @@ fn sim_depositstrategy() {
     //The total value of the portfolio should be equal to the total amount of wages
     //Note: if costs aren't zero then this isn't true, so no broker costs can be added to this
     //simulation
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: sim,
-    };
-    let result = runner.run();
-    println!("{:?}", result);
-    assert!(result.0 == 12_000.0);
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
+    assert!(*sim.get_total_value() == 12_000.0);
 }

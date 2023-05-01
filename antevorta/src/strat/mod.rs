@@ -17,7 +17,7 @@ use crate::schedule::Schedule;
 //of a typical rebalance (and these changes in states have intra-account dependencies) so we need
 //to add the lifecycle methods to the strategy, so they can be called through accounts.
 pub trait InvestmentStrategy: Clone + Strategy + TransferFrom + TransferTo {
-    fn get_liquidation_value(&mut self) -> CashValue;
+    fn get_liquidation_value(&self) -> CashValue;
     fn trades_between(&self, start: &i64, end: &i64) -> Vec<Trade>;
     fn dividends_between(&self, start: &i64, end: &i64) -> Vec<DividendPayment>;
     fn check(&mut self);
@@ -83,7 +83,7 @@ impl TransferFrom for StaticInvestmentStrategy {
 }
 
 impl InvestmentStrategy for StaticInvestmentStrategy {
-    fn get_liquidation_value(&mut self) -> CashValue {
+    fn get_liquidation_value(&self) -> CashValue {
         self.brkr.get_liquidation_value()
     }
 

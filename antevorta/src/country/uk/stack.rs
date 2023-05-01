@@ -137,7 +137,7 @@ impl<S: InvestmentStrategy> Isa<S> {
         self.current_tax_year_deposits = CashValue::default();
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 
@@ -230,7 +230,7 @@ impl<S: InvestmentStrategy> Gia<S> {
         CashValue::from(sum)
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 
@@ -328,7 +328,7 @@ impl<S: InvestmentStrategy> Sipp<S> {
         self.strat.zero();
     }
 
-    pub fn liquidation_value(&mut self) -> CashValue {
+    pub fn liquidation_value(&self) -> CashValue {
         self.strat.get_liquidation_value()
     }
 
@@ -597,12 +597,11 @@ impl<T: SimDataSource> Mortgage<T> {
 mod tests {
 
     use alator::broker::{Trade, TradeType};
+    use alator::clock::ClockBuilder;
     use alator::types::Frequency;
-    use alator::{clock::ClockBuilder, types::DateTime};
-    use std::collections::HashMap;
     use std::rc::Rc;
 
-    use crate::input::{FakeRatesDataGenerator, HashMapSourceSimBuilder};
+    use crate::input::{daily_data_generator_static, HashMapSourceSimBuilder};
 
     use super::{calculate_capital_gains, isa_deposit_logic, sipp_deposit_logic};
     use super::{BankAcc, LoanEvent, Mortgage};
@@ -690,11 +689,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let mut rates: HashMap<DateTime, f64> = HashMap::new();
-        let mut rate_getter = FakeRatesDataGenerator::get();
-        for date in clock.borrow().peek() {
-            rates.insert(date, rate_getter());
-        }
+        let rates = daily_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)
@@ -721,11 +716,7 @@ mod tests {
             .with_frequency(&Frequency::Daily)
             .build();
 
-        let mut rates: HashMap<DateTime, f64> = HashMap::new();
-        let mut rate_getter = FakeRatesDataGenerator::get();
-        for date in clock.borrow().peek() {
-            rates.insert(date, rate_getter());
-        }
+        let rates = daily_data_generator_static(0.02, Rc::clone(&clock));
         let source = HashMapSourceSimBuilder::start()
             .with_clock(Rc::clone(&clock))
             .with_rates(rates)

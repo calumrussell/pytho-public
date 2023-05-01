@@ -2,24 +2,24 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
-use antevorta::input::FakeHashMapSourceSim;
+use antevorta::input::build_hashmapsource_random;
+use antevorta::output::UKSimulationOutput;
 use std::rc::Rc;
 
 use antevorta::country::uk::Config;
 use antevorta::schedule::Schedule;
-use antevorta::sim::SimRunner;
 use antevorta::strat::StaticInvestmentStrategy;
 
 #[test]
 fn sim_test() {
-    let clock = ClockBuilder::with_length_in_dates(1, 100)
+    let clock = ClockBuilder::with_length_in_days(1, 1000)
         .with_frequency(&alator::types::Frequency::Daily)
         .build();
-    let src = FakeHashMapSourceSim::get(Rc::clone(&clock));
+    let src = build_hashmapsource_random(Rc::clone(&clock));
 
     let mut target_weights = PortfolioAllocation::new();
     target_weights.insert("ABC", 0.5);
-    target_weights.insert("BCD", 0.5);
+    target_weights.insert("BCD", 1.5);
 
     let exchange = DefaultExchangeBuilder::new()
         .with_clock(Rc::clone(&clock))
@@ -50,7 +50,7 @@ fn sim_test() {
                 "value": 4000.0,
                 "static_growth": 0.0001,
                 "schedule": {
-                    "schedule_type": "EndOfMonth"
+                    "schedule_type": "StartOfMonth"
                 }
             }
         ],
@@ -70,14 +70,14 @@ fn sim_test() {
         ]
     }"#;
 
-    let sim = Config::parse(config)
+    let mut sim = Config::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
-    let mut runner = SimRunner {
-        clock: Rc::clone(&clock),
-        state: sim,
-    };
 
-    let result = runner.run();
-    result.0;
+    while clock.borrow().has_next() {
+        clock.borrow_mut().tick();
+        sim.update();
+    }
+
+    let _perf = UKSimulationOutput::get_output(&sim);
 }

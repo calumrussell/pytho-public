@@ -1,47 +1,59 @@
-use std::collections::HashMap;
-
 use alator::types::{CashValue, DateTime};
 
 use crate::acc::CanTransfer;
-use crate::input::{SimDataSource, HashMapSourceSim};
+use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
 
-use super::tax::{TaxPeriod, UKTaxableIncome};
+use super::tax::TaxPeriod;
 use super::UKSimulationState;
 
 trait WillFlow<S: InvestmentStrategy> {
+    //Check should only deposit funds into cash. We need to track deposits to other accounts so it
+    //makes sense to only credit investment accounts from one place (when the portfolio is
+    //rebalanced).
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>);
     fn get_value(&self) -> CashValue;
     fn set_value(&mut self, cash: &f64);
 }
 
-#[derive(Clone)]
-pub enum Flow{
-    Employment(Employment),
+//Default growth is inflation-linked. This type of growth assumes that the polling frequency for
+//changes to the flow state is monthly. If it is more than this, the value will be updated too
+//often.
+#[derive(Clone, Debug)]
+pub enum Flow {
+    Employment(InflationLinkedGrowth, Employment),
     EmploymentStaticGrowth(StaticGrowth, Employment),
-    EmploymentFixedGrowth(FixedGrowth, Employment),
-    EmploymentPAYE(EmploymentPAYE),
+    EmploymentPAYE(InflationLinkedGrowth, EmploymentPAYE),
     EmploymentPAYEStaticGrowth(StaticGrowth, EmploymentPAYE),
-    EmploymentPAYEFixedGrowth(FixedGrowth, EmploymentPAYE),
     Rental(Rental),
     Expense(Expense),
-    InflationLinkedExpense(InflationDataHashMap, Expense),
+    InflationLinkedExpense(InflationLinkedGrowth, Expense),
     PctOfIncomeExpense(PctOfIncomeExpense),
 }
 
 impl Flow {
+    pub fn is_expense(&self) -> bool {
+        match self {
+            Flow::Expense(_) | Flow::InflationLinkedExpense(_, _) | Flow::PctOfIncomeExpense(_) => {
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn check<S: InvestmentStrategy>(
         &mut self,
         curr: &DateTime,
         state: &mut UKSimulationState<S>,
     ) {
+        //Sometimes the check call will be made to the underlying object. If the data references
+        //some additional data, i.e. inflation, then the call is made to the growth object instead
+        //which modifies the value
         match self {
-            Flow::Employment(val) => val.check(curr, state),
-            Flow::EmploymentFixedGrowth(growth, val) => growth.check(curr, state, val),
+            Flow::Employment(growth, val) => growth.check(curr, state, val),
             Flow::EmploymentStaticGrowth(growth, val) => growth.check(curr, state, val),
-            Flow::EmploymentPAYE(val) => val.check(curr, state),
-            Flow::EmploymentPAYEFixedGrowth(growth, val) => growth.check(curr, state, val),
+            Flow::EmploymentPAYE(growth, val) => growth.check(curr, state, val),
             Flow::EmploymentPAYEStaticGrowth(growth, val) => growth.check(curr, state, val),
             Flow::Rental(val) => val.check(curr, state),
             Flow::Expense(val) => val.check(curr, state),
@@ -51,12 +63,13 @@ impl Flow {
     }
 }
 
-#[derive(Clone)]
-pub struct InflationDataHashMap {
+#[derive(Clone, Debug)]
+pub struct InflationLinkedGrowth {
     source: HashMapSourceSim,
+    schedule: Schedule,
 }
 
-impl InflationDataHashMap {
+impl InflationLinkedGrowth {
     fn check<F: WillFlow<S>, S: InvestmentStrategy>(
         &mut self,
         curr: &i64,
@@ -64,23 +77,25 @@ impl InflationDataHashMap {
         target: &mut F,
     ) {
         target.check(curr, state);
-        let curr_val = target.get_value();
-        if let Some(inflation) = self.source.get_current_inflation() {
-            let new_val = *curr_val * (1.0 + inflation);
-            target.set_value(&new_val);
-        } else {
-            panic!("Created fixed growth rate employement income with bad date");
+        if self.schedule.check(curr) {
+            let curr_val = target.get_value();
+            if let Some(inflation) = self.source.get_current_inflation() {
+                let new_val = *curr_val * (1.0 + inflation);
+                target.set_value(&new_val);
+            } else {
+                panic!("Created fixed growth rate employement income with bad date");
+            }
         }
     }
 }
 
-impl InflationDataHashMap {
-    fn new(source: HashMapSourceSim) -> Self {
-        Self { source }
+impl InflationLinkedGrowth {
+    fn new(source: HashMapSourceSim, schedule: Schedule) -> Self {
+        Self { source, schedule }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StaticGrowth {
     growth_rate: f64,
 }
@@ -103,36 +118,7 @@ impl StaticGrowth {
     }
 }
 
-type FixedGrowthData = HashMap<DateTime, f64>;
-
-#[derive(Clone)]
-pub struct FixedGrowth {
-    growth_data: FixedGrowthData,
-}
-
-impl FixedGrowth {
-    fn check<F: WillFlow<S>, S: InvestmentStrategy>(
-        &mut self,
-        curr: &i64,
-        state: &mut UKSimulationState<S>,
-        target: &mut F,
-    ) {
-        target.check(curr, state);
-        let curr_val = target.get_value();
-        if let Some(growth) = self.growth_data.get(&DateTime::from(*curr)) {
-            let new_val = *curr_val * (1.0 + growth);
-            target.set_value(&new_val)
-        } else {
-            panic!("Created fixed growth rate employement income with bad date");
-        }
-    }
-
-    fn new(growth_data: FixedGrowthData) -> Self {
-        Self { growth_data }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Employment {
     value: CashValue,
     schedule: Schedule,
@@ -141,14 +127,24 @@ pub struct Employment {
 impl<S: InvestmentStrategy> WillFlow<S> for Employment {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let tax_type: UKTaxableIncome = self.clone().into();
-            state.1.annual_tax.add_income(tax_type);
-            let contribution = *self.value * state.0.contribution_pct;
-            let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
-            state.1.annual_tax.add_contribution(&contributed);
+            //Non-paye employment income deducts contributions but doesn't take income tax or NI
+            //until annual tax date
+            state.non_paye_income_annual =
+                state.non_paye_income_annual.clone() + self.value.clone();
+
+            let contribution = *self.value * state.contribution_pct;
+            let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
+            state.sipp_contributions_annual =
+                state.sipp_contributions_annual.clone() + contributed.clone();
+            state.paid_into_sipp_since_start =
+                state.paid_into_sipp_since_start.clone() + contributed.clone();
             let net_pay = *self.value - *contributed + *remainder;
-            state.2.paid_income(&net_pay);
-            state.1.bank.deposit(&net_pay);
+            state.bank.deposit(&net_pay);
+
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.net_income_annual = state.net_income_annual.clone() + net_pay.into();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -168,14 +164,10 @@ impl Employment {
         Flow::EmploymentStaticGrowth(growth, employment)
     }
 
-    pub fn fixed_growth(value: CashValue, schedule: Schedule, growth: FixedGrowthData) -> Flow {
-        let growth = FixedGrowth::new(growth);
-        let employment = Employment::new(value, schedule);
-        Flow::EmploymentFixedGrowth(growth, employment)
-    }
-
-    pub fn flow(value: CashValue, schedule: Schedule) -> Flow {
-        Flow::Employment(Self::new(value, schedule))
+    pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
+        let income = Employment::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
+        Flow::Employment(data, income)
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
@@ -183,13 +175,7 @@ impl Employment {
     }
 }
 
-impl From<Employment> for UKTaxableIncome {
-    fn from(val: Employment) -> Self {
-        UKTaxableIncome::Wage(val.value)
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmploymentPAYE {
     value: CashValue,
     schedule: Schedule,
@@ -198,19 +184,35 @@ pub struct EmploymentPAYE {
 impl<S: InvestmentStrategy> WillFlow<S> for EmploymentPAYE {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let contribution = *self.value * state.0.contribution_pct;
-            let (contributed, remainder) = state.1.sipp.deposit_wrapper(&contribution);
-            state.1.annual_tax.add_contribution(&contributed);
+            //Have to deduct income tax and NI and SIPP contributions
+            let contribution = *self.value * state.contribution_pct;
+            let (contributed, remainder) = state.sipp.deposit_wrapper(&contribution);
+            state.sipp_contributions_annual =
+                state.sipp_contributions_annual.clone() + contributed.clone();
+            state.paid_into_sipp_since_start =
+                state.paid_into_sipp_since_start.clone() + contributed.clone();
+
+            //Takes both income tax and NI
             let paye_paid = TaxPeriod::paye(
                 &self.value,
                 &contributed,
-                state.0.nic_group,
-                &state.1.tax_config,
+                state.nic_group,
+                &state.tax_config,
             );
-            state.1.annual_tax.add_paye_paid(&paye_paid.total());
+            state.tax_paid_annual = state.tax_paid_annual.clone() + paye_paid.total();
+            state.tax_paid_paye_annual = state.tax_paid_paye_annual.clone() + paye_paid.total();
+
+            //We don't deduct paye paid from bank but deduct it straight from gross_pay
             let net_pay = *self.value + *remainder - *contributed - *paye_paid.total();
-            state.2.paid_income(&net_pay);
-            state.1.bank.deposit(&net_pay);
+            state.bank.deposit(&net_pay);
+
+            state.paye_income_annual = state.paye_income_annual.clone() + net_pay.into();
+            state.tax_paid_annual = state.tax_paid_annual.clone() + paye_paid.total();
+
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.net_income_annual = state.net_income_annual.clone() + net_pay.into();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + net_pay.into();
         }
     }
 
@@ -230,14 +232,10 @@ impl EmploymentPAYE {
         Flow::EmploymentPAYEStaticGrowth(growth, employment)
     }
 
-    pub fn fixed_growth(value: CashValue, schedule: Schedule, growth: FixedGrowthData) -> Flow {
-        let growth = FixedGrowth::new(growth);
-        let employment = EmploymentPAYE::new(value, schedule);
-        Flow::EmploymentPAYEFixedGrowth(growth, employment)
-    }
-
-    pub fn flow(value: CashValue, schedule: Schedule) -> Flow {
-        Flow::EmploymentPAYE(Self::new(value, schedule))
+    pub fn flow(value: CashValue, schedule: Schedule, source: HashMapSourceSim) -> Flow {
+        let income = EmploymentPAYE::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
+        Flow::EmploymentPAYE(data, income)
     }
 
     pub fn new(value: CashValue, schedule: Schedule) -> Self {
@@ -245,13 +243,7 @@ impl EmploymentPAYE {
     }
 }
 
-impl From<EmploymentPAYE> for UKTaxableIncome {
-    fn from(val: EmploymentPAYE) -> Self {
-        UKTaxableIncome::WagePAYE(val.value)
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Rental {
     value: CashValue,
     schedule: Schedule,
@@ -260,10 +252,12 @@ pub struct Rental {
 impl<S: InvestmentStrategy> WillFlow<S> for Rental {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            let tax_type: UKTaxableIncome = self.clone().into();
-            state.1.annual_tax.add_income(tax_type);
-            state.1.bank.deposit(&self.value);
-            state.2.paid_income(&self.value);
+            state.rental_income_annual = state.rental_income_annual.clone() + self.value.clone();
+            state.bank.deposit(&self.value);
+
+            state.gross_income_annual = state.gross_income_annual.clone() + self.value.clone();
+            state.income_paid_in_curr_loop =
+                state.income_paid_in_curr_loop.clone() + self.value.clone();
         }
     }
 
@@ -286,13 +280,7 @@ impl Rental {
     }
 }
 
-impl From<Rental> for UKTaxableIncome {
-    fn from(val: Rental) -> Self {
-        UKTaxableIncome::Rental(val.value)
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Expense {
     value: CashValue,
     schedule: Schedule,
@@ -301,7 +289,8 @@ pub struct Expense {
 impl<S: InvestmentStrategy> WillFlow<S> for Expense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            state.1.bank.withdraw(&self.value);
+            state.expense_annual = state.expense_annual.clone() + self.value.clone().into();
+            state.bank.withdraw(&self.value);
         }
     }
 
@@ -324,8 +313,8 @@ impl Expense {
         schedule: Schedule,
         source: HashMapSourceSim,
     ) -> Flow {
-        let expense = Expense::new(value, schedule);
-        let data = InflationDataHashMap::new(source);
+        let expense = Expense::new(value, schedule.clone());
+        let data = InflationLinkedGrowth::new(source, schedule);
         Flow::InflationLinkedExpense(data, expense)
     }
 
@@ -334,7 +323,7 @@ impl Expense {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PctOfIncomeExpense {
     pct: f64,
     schedule: Schedule,
@@ -343,13 +332,17 @@ pub struct PctOfIncomeExpense {
 impl<S: InvestmentStrategy> WillFlow<S> for PctOfIncomeExpense {
     fn check(&self, curr: &i64, state: &mut UKSimulationState<S>) {
         if self.schedule.check(curr) {
-            if *state.2.income_paid <= 0.0 {
+            //This is correct, tried to fiddle with this and we need to make sure that income runs
+            //before expense. If this isn't true then the simulation cannot continue/we generate
+            //lots of erroneous transactions.
+            if *state.income_paid_in_curr_loop <= 0.0 {
                 //Panic here because if this hits then the caller likely made an error in the
                 //simulation config
                 panic!("Created PctOfIncomeExpense with no income");
             } else {
-                let expense_value = self.pct * *state.2.income_paid;
-                state.1.bank.withdraw(&expense_value);
+                let expense_value = self.pct * *state.income_paid_in_curr_loop;
+                state.expense_annual = state.expense_annual.clone() + expense_value.into();
+                state.bank.withdraw(&expense_value);
             }
         }
     }
@@ -370,28 +363,5 @@ impl PctOfIncomeExpense {
 
     pub fn flow(pct: f64, schedule: Schedule) -> Flow {
         Flow::PctOfIncomeExpense(Self::new(pct, schedule))
-    }
-}
-
-/*
- * Income that is created outside of the main simulator loop, for example capital gains on
- * portfolio transactions.
- * Reason to distinguish this type of income is that other types of income can grow or be set by
- * the client before the simulation starts running. With these types of income, they are only
- * created during a simulation in response to the output of the simulation's internal state.
- */
-pub enum UKIncomeInternal {
-    Dividend(CashValue),
-    ResiPropertyGain(CashValue),
-    OtherGains(CashValue),
-}
-
-impl From<UKIncomeInternal> for UKTaxableIncome {
-    fn from(inc: UKIncomeInternal) -> Self {
-        match inc {
-            UKIncomeInternal::Dividend(value) => UKTaxableIncome::Dividend(value),
-            UKIncomeInternal::ResiPropertyGain(value) => UKTaxableIncome::ResiPropertyGains(value),
-            UKIncomeInternal::OtherGains(value) => UKTaxableIncome::OtherGains(value),
-        }
     }
 }
