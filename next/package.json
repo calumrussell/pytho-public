@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "cd lib/panacea && wasm-pack build --target bundler --release && cd ../../ && next build",
     "start": "next start",
     "lint": "yarn prettier --write ./src ./lib && next lint"
   },

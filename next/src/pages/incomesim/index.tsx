@@ -139,7 +139,7 @@ export const Inner = ({ portfolios, plans }: IncomeSimProps) => {
                     dispatch({
                       type: "UPDATE",
                       name: "simLength",
-                      value: ev.target.value,
+                      value: Number(ev.target.value),
                     })
                   }
                 />
@@ -158,7 +158,7 @@ export const Inner = ({ portfolios, plans }: IncomeSimProps) => {
                     dispatch({
                       type: "UPDATE",
                       name: "runs",
-                      value: ev.target.value,
+                      value: Number(ev.target.value),
                     })
                   }
                 />
@@ -177,7 +177,7 @@ export const Inner = ({ portfolios, plans }: IncomeSimProps) => {
                     dispatch({
                       type: "UPDATE",
                       name: "inflationMu",
-                      value: ev.target.value,
+                      value: Number(ev.target.value),
                     })
                   }
                 />
@@ -196,7 +196,7 @@ export const Inner = ({ portfolios, plans }: IncomeSimProps) => {
                     dispatch({
                       type: "UPDATE",
                       name: "inflationVar",
-                      value: ev.target.value,
+                      value: Number(ev.target.value),
                     })
                   }
                 />
