@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearch"]
 }
 
@@ -71,27 +71,18 @@ model api_secthirteenfposition {
   @@unique([thirteenf_id, cusip], map: "api_secthirteenfposition_thirteenf_id_cusip_227f54a4_uniq")
 }
 
-model api_sess {
-  sid    String   @id(map: "session_pkey") @db.VarChar
-  sess   Json     @db.Json
-  expire DateTime @db.Timestamp(6)
-
-  @@index([expire], map: "IDX_session_expire")
-}
-
 model api_user {
-  id                    Int                     @id @default(autoincrement())
-  user_key              String                  @unique(map: "api_user_userkey") @db.VarChar(50)
-  api_userfinancialplan api_userfinancialplan[]
-  api_userportfolio     api_userportfolio[]
+  user_key      String                  @id @default(uuid())
+  portfolio     api_userportfolio[]
+  financialplan api_userfinancialplan[]
 }
 
 model api_userfinancialplan {
-  id       Int       @id @default(autoincrement())
-  user_key String?   @db.Char(50)
-  plan     Json?
-  name     String?   @db.VarChar(20)
-  api_user api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
+  id       Int      @id @default(autoincrement())
+  plan     Json
+  name     String   @db.VarChar(20)
+  user_key String
+  user     api_user @relation(fields: [user_key], references: [user_key])
 }
 
 model api_userissuer {
@@ -103,35 +94,11 @@ model api_userissuer {
 }
 
 model api_userportfolio {
-  id        Int       @id @default(autoincrement())
-  user_key  String?   @db.Char(50)
-  portfolio Json?
-  name      String?   @db.VarChar(20)
-  api_user  api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
-}
-
-model django_content_type {
-  id        Int    @id @default(autoincrement())
-  app_label String @db.VarChar(100)
-  model     String @db.VarChar(100)
-
-  @@unique([app_label, model], map: "django_content_type_app_label_model_76bd3d3b_uniq")
-}
-
-model django_migrations {
-  id      Int      @id @default(autoincrement())
-  app     String   @db.VarChar(255)
-  name    String   @db.VarChar(255)
-  applied DateTime @db.Timestamptz(6)
-}
-
-model django_session {
-  session_key  String   @id @db.VarChar(40)
-  session_data String
-  expire_date  DateTime @db.Timestamptz(6)
-
-  @@index([expire_date], map: "django_session_expire_date_a5c62663")
-  @@index([session_key], map: "django_session_session_key_c0390e0f_like")
+  id        Int      @id @default(autoincrement())
+  user_key  String
+  portfolio Json
+  name      String   @db.VarChar(20)
+  user      api_user @relation(fields: [user_key], references: [user_key])
 }
 
 model ff_factors {
