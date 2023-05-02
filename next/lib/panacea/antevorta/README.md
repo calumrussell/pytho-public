@@ -5,7 +5,7 @@ Input that the simulation engine has to cover
   {
     "starting_cash": float,
     "nic_group": A | etc.
-    "lifetime_pension_contributions": float, 
+    "lifetime_pension_contributions": float,
     "emergency_cash_min": float,
     "contribution_pct": float,
     "flows": array[Flow],
@@ -27,6 +27,6 @@ Input that the simulation engine has to cover
     "person": number, identifies person for tax calcs,
     "rate": number, above overnight interbank rate, Mortgage
     "term: number, only for Mortgage,
-    "fix_length": number, only if rate_type | Floating 
+    "fix_length": number, only if rate_type | Floating
   }
 ```
