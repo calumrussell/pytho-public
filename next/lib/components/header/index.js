@@ -46,7 +46,7 @@ const PageHeaderTitleStyle = styled.div`
 const UserKey = ({ isLoggedIn, user }) => {
   if (isLoggedIn) {
     const fmtUserKey = user.slice(0, 5) + "...";
-    return <Text>{fmtUserKey}</Text>;
+    return <Text style={{ paddingRight: "0.5rem" }}>{fmtUserKey}</Text>;
   }
   return null;
 };
