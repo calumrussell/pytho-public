@@ -20,8 +20,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const { userKey } = req.session.user;
 
-    await prisma.api_userportfolio.create({
-      data: {
+    await prisma.api_userportfolio.upsert({
+      where: {
+        name_user_key: {
+          user_key: userKey,
+          name: name,
+        },
+      },
+      update: {
+        portfolio: portfolio,
+      },
+      create: {
         user_key: userKey,
         portfolio: portfolio,
         name: name,

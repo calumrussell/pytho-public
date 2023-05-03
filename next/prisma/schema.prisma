@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
 }
 
 model api_coverage {
@@ -19,6 +21,8 @@ model api_coverage {
   exchange      String? @db.VarChar(20)
 
   @@unique([country_name, name, currency, issuer], map: "api_coverage_country_name_name_currency_issuer_8b1be644_uniq")
+  @@index([name(ops: raw("gist_trgm_ops"))], map: "coverage_name_gist_idx", type: Gist)
+  @@index([ticker(ops: raw("gist_trgm_ops"))], map: "coverage_ticker_gist_idx", type: Gist)
 }
 
 model api_factorreturns {
@@ -77,19 +81,23 @@ model api_user {
 }
 
 model api_userfinancialplan {
-  id       Int       @id @default(autoincrement())
+  id       Int      @id @default(autoincrement())
   plan     Json
-  name     String    @db.VarChar(20)
-  user_key String?   @db.Uuid
-  api_user api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
+  name     String   @db.VarChar(20)
+  user_key String   @db.Uuid
+  api_user api_user @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
+
+  @@unique([name, user_key], map: "api_userfinancialplan_uniq")
 }
 
 model api_userportfolio {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   portfolio Json
-  name      String    @db.VarChar(20)
-  user_key  String?   @db.Uuid
-  api_user  api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
+  name      String   @db.VarChar(20)
+  user_key  String   @db.Uuid
+  api_user  api_user @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
+
+  @@unique([name, user_key], map: "api_userportfolio_uniq")
 }
 
 model ff_factors {
