@@ -23,12 +23,14 @@ export const PortfolioSearch = (props) => {
 
   const searchSecurityFunc = (input) => {
     const value = input.value;
-    const url = `/api/suggest?s=${encodeURIComponent(value)}`;
-    const copy = {
-      ...input,
-      url,
-    };
-    getOptions(copy);
+    if (value.length > 2) {
+      const url = `/api/suggest?s=${encodeURIComponent(value)}`;
+      const copy = {
+        ...input,
+        url,
+      };
+      getOptions(copy);
+    }
   };
 
   const renderFunc = (val) => {

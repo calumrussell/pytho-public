@@ -34,10 +34,15 @@ export default async function handler(
           },
         },
       });
+
+      Another example that was also slow
+      let suggest =
+        await prisma.$queryRaw`select * from api_coverage where to_tsvector('english', name) @@ plainto_tsquery('english', ${req.query.s}) or to_tsvector('english', ticker) @@ plainto_tsquery('english', ${req.query.s});`;
     */
 
     let suggest =
-      await prisma.$queryRaw`select * from api_coverage where to_tsvector('english', issuer) @@ plainto_tsquery('english', ${req.query.s}) or to_tsvector('english', ticker) @@ plainto_tsquery('english', ${req.query.s});`;
+      await prisma.$queryRaw`select *, word_similarity(${req.query.s}, name) as sml from api_coverage where ${req.query.s} <% name union select *, word_similarity(${req.query.s}, ticker) as sml from api_coverage where ${req.query.s} <% ticker order by sml desc, ticker;`;
+
     return res.status(200).json({ data: suggest });
   } catch (e) {
     console.log(e);
