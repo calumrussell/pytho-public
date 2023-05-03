@@ -7,18 +7,18 @@ def get_url(exchange, api_key):
     url = f'https://eodhistoricaldata.com/api/exchange-symbol-list/{exchange}?api_token={api_key}&fmt=json'
     return url
 
-def build_query_equity(values):
+def build_query_equity(values, source):
     base = "insert into api_coverage(country_name, name, currency, ticker, security_type, asset_class, exchange) VALUES "
     for value in values:
         name = value["Name"].replace("'", "''")
-        base += f'(\'{value["Country"]}\',\'{name}\',\'{value["Currency"]}\', \'{value["Code"]}\', \'equity\', \'equity\', \'{value["Exchange"]}\'),'
+        base += f'(\'{value["Country"]}\',\'{name}\',\'{value["Currency"]}\', \'{value["Code"]}.{source}\', \'equity\', \'equity\', \'{value["Exchange"]}\'),'
     return base[:-1] + ";"
 
-def build_query_fund(values):
+def build_query_fund(values, source):
     base = "insert into api_coverage(country_name, name, currency, ticker, security_type, asset_class) VALUES "
     for value in values:
         name = value["Name"].replace("'", "''")
-        base += f'(\'{value["Country"]}\',\'{name}\',\'{value["Currency"]}\', \'{value["Code"]}\', \'fund\', \'fund\'),'
+        base += f'(\'{value["Country"]}\',\'{name}\',\'{value["Currency"]}\', \'{value["Code"]}.{source}\', \'fund\', \'fund\'),'
     return base[:-1] + ";"
 
 sources = ['US', 'LSE', 'EUFUND', 'V', 'NEO', 'FUND', 'BE', 'HM', 'XETRA', 'DU', 'F', 'HA', 'STU', 'MU', 'LU', 'VI', 'PA', 'BR', 'AS', 'VX', 'MC', 'SW', 'IR', 'AU']
@@ -44,9 +44,9 @@ if __name__ == "__main__":
         if not json:
             continue
         if source == "EUFUND":
-            query = build_query_fund(json)
+            query = build_query_fund(json, source)
         else:
-            query = build_query_equity(json)
+            query = build_query_equity(json, source)
         cur.execute(query)
         conn.commit()
 
