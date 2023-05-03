@@ -1,6 +1,5 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -72,33 +71,25 @@ model api_secthirteenfposition {
 }
 
 model api_user {
-  user_key      String                  @id @default(uuid())
-  portfolio     api_userportfolio[]
-  financialplan api_userfinancialplan[]
+  user_key              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_userfinancialplan api_userfinancialplan[]
+  api_userportfolio     api_userportfolio[]
 }
 
 model api_userfinancialplan {
-  id       Int      @id @default(autoincrement())
+  id       Int       @id @default(autoincrement())
   plan     Json
-  name     String   @db.VarChar(20)
-  user_key String
-  user     api_user @relation(fields: [user_key], references: [user_key])
-}
-
-model api_userissuer {
-  id        Int @id @default(autoincrement())
-  user_id   Int
-  issuer_id Int
-
-  @@unique([user_id, issuer_id], map: "api_userissuer_user_id_issuer_id_b988f29a_uniq")
+  name     String    @db.VarChar(20)
+  user_key String?   @db.Uuid
+  api_user api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
 }
 
 model api_userportfolio {
-  id        Int      @id @default(autoincrement())
-  user_key  String
+  id        Int       @id @default(autoincrement())
   portfolio Json
-  name      String   @db.VarChar(20)
-  user      api_user @relation(fields: [user_key], references: [user_key])
+  name      String    @db.VarChar(20)
+  user_key  String?   @db.Uuid
+  api_user  api_user? @relation(fields: [user_key], references: [user_key], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_key")
 }
 
 model ff_factors {
