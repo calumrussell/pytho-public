@@ -264,5 +264,5 @@ mod tests {
         let alator = setup();
         //This is larger dataset, this tests that we load without errors
         let _res = alator_backtest(alator.into());
-    
+    }
 }
