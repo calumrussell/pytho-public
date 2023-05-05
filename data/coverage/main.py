@@ -39,15 +39,21 @@ if __name__ == "__main__":
         r = requests.get(url)
         print(source)
         json = r.json()
+        chunked_json = []
+        for i in range(0, len(json), 1000):
+            chunked_json.append(json[i: i+1000])
 
         time.sleep(3)
         if not json:
             continue
         if source == "EUFUND":
-            query = build_query_fund(json, source)
+            for chunk in chunked_json:
+                query = build_query_fund(chunk, source)
+                cur.execute(query)
         else:
-            query = build_query_equity(json, source)
-        cur.execute(query)
+            for chunk in chunked_json:
+                query = build_query_equity(chunk, source)
+                cur.execute(query)
         conn.commit()
 
     
