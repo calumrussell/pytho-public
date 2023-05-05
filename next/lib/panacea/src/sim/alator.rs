@@ -187,7 +187,7 @@ mod tests {
         EodRawAlatorInput {
             data: to_vec,
             assets: vec!["100".to_string()],
-            weights: HashMap::new(),
+            weights,
         }
     }
 
@@ -264,5 +264,5 @@ mod tests {
         let alator = setup();
         //This is larger dataset, this tests that we load without errors
         let _res = alator_backtest(alator.into());
-    }
+    
 }

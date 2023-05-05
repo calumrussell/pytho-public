@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "alator"
 version = "0.2.8"
-source = "git+https://github.com/calumrussell/alator.git?tag=v0.2.8#af61db9f6ccf09cac930f8e6d4d4badbeeb2b6c0"
+source = "git+https://github.com/calumrussell/alator.git?branch=cagr-bug-fix#fd0a075992764b1b1145928200988f9d64da6e60"
 dependencies = [
  "env_logger",
  "itertools",
