@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { EodSource } from "@Common/index";
 import prisma from "@Root/lib/prisma";
 
-import { backtest } from "../../../lib/panacea/pkg";
+import { backtest } from "../../../lib/panacea";
 
 interface BacktestRequest extends NextApiRequest {
   body: {

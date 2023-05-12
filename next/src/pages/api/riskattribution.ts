@@ -1,6 +1,6 @@
 import { EodSource } from "@Common/index";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { risk } from "../../../lib/panacea/pkg";
+import { risk } from "../../../lib/panacea";
 import prisma from "@Root/lib/prisma";
 
 interface RiskAttributionRequest extends NextApiRequest {
@@ -72,8 +72,10 @@ export default async function handler(
       throw Error("Missing Issuer");
     }
 
-    const assetTickers = assetIssuers.map((issuer) =>
-      issuer.ticker ? issuer.ticker : ""
+    //Horrible time complexity but fine in this instance
+    const orderedAssetsIssuers = assetsToNumber.map(num => assetIssuers.find(issuer => issuer.id === num));
+    const assetTickers = orderedAssetsIssuers.map((issuer) =>
+      issuer ? issuer.ticker ? issuer.ticker : "" : ""
     );
     const data = await EodSource.getPricesFlat(assetTickers);
     if (data._tag === "None") {

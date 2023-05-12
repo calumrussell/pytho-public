@@ -3,7 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { EodSource } from "@Common/index";
 import prisma from "@Root/lib/prisma";
 
-import { antevorta } from "../../../lib/panacea/pkg";
+import { antevorta } from "../../../lib/panacea";
 
 //https://docs.rs/getrandom/latest/getrandom/#nodejs-es-module-support
 import { webcrypto } from "node:crypto";
