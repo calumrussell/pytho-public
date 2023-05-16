@@ -1,0 +1,16 @@
+{
+  "name": "panacea",
+  "version": "0.1.0",
+  "files": [
+    "panacea_bg.wasm",
+    "panacea.js",
+    "panacea_bg.js",
+    "panacea.d.ts"
+  ],
+  "module": "panacea.js",
+  "types": "panacea.d.ts",
+  "sideEffects": [
+    "./panacea.js",
+    "./snippets/*"
+  ]
+}

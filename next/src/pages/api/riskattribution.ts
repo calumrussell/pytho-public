@@ -1,6 +1,6 @@
 import { EodSource } from "@Common/index";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { risk } from "../../../lib/panacea";
+import { risk } from "@Root/lib/panacea/pkg";
 import prisma from "@Root/lib/prisma";
 
 interface RiskAttributionRequest extends NextApiRequest {

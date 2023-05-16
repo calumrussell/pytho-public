@@ -1,6 +1,6 @@
 version: '3.7'
 services:
-  postgres:
+  pythodb:
     container_name: pythodb
     image: postgres
     env_file:
@@ -8,25 +8,25 @@ services:
     volumes:
        - ./db/db:/pg
     ports:
-      - "100.112.31.65:10000:5432"
+      - 100.112.31.65:11000:5432
     restart: unless-stopped
 
-  app:
+  pythoapp:
     container_name: pythoapp
     build:
       context: ./next
     env_file:
       - ./next/.env
     depends_on:
-      - postgres
+      - pythodb 
 
-  tunnel:
+  pythotunnel:
     container_name: pythotunnel
     image: cloudflare/cloudflared
     restart: unless-stopped
     command: tunnel run
     environment:
-      - TUNNEL_TOKEN=eyJhIjoiZjA5ZWEyMjA0OTYxMWI5YTdiODY4NTRlZGFhMDcyZjQiLCJ0IjoiOTEzNzlkNzctNTdjOC00Y2Y5LWE2YTQtN2UzODc2NTQ1OTMwIiwicyI6Ik5UZGtPV1l5TVdZdFlXVmxOQzAwWlRBNUxUaGxPRE10TVRJMFpERm1NalppTURrNCJ9
+      - TUNNEL_TOKEN=eyJhIjoiZjA5ZWEyMjA0OTYxMWI5YTdiODY4NTRlZGFhMDcyZjQiLCJ0IjoiOWUzMWZlMWItNTE3OS00YjUzLWFiZTktMThmODQ4ZDlmMzgwIiwicyI6IlltRmtNVFpqTURJdE5qbG1PQzAwT0dZd0xUaGxOMk10WXpjMlpXWXdPR1UxWVdKaCJ9
 
 networks:
   default:

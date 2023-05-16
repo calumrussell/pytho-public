@@ -1,7 +1,7 @@
 FROM node:18
 
 WORKDIR /app
-COPY . .
+COPY ./ .
 RUN yarn install
 ENV NEXT_TELEMETRY_DISABLED 1
 
@@ -10,7 +10,6 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="${PATH}:/root/.cargo/bin"
 RUN cargo install wasm-pack
 RUN yarn run build
-RUN yarn prisma migrate dev
 
 EXPOSE 3000
 
