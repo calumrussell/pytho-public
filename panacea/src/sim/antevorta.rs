@@ -5,7 +5,7 @@ use alator::clock::ClockBuilder;
 use alator::exchange::DefaultExchangeBuilder;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::{DateTime, PortfolioAllocation};
-use antevorta::country::uk::Config;
+use antevorta::config::uk::UKSimConfig;
 use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use antevorta::output::UKSimulationOutput;
 use antevorta::schedule::Schedule;
@@ -140,7 +140,7 @@ pub fn antevorta_multiple(input: EodRawAntevortaInput) -> Result<AntevortaResult
 
         let strat =
             StaticInvestmentStrategy::new(brkr, Schedule::EveryFriday, weights, Rc::clone(&clock));
-        let config = Config::parse(&input.config.clone()).unwrap();
+        let config = UKSimConfig::parse(&input.config.clone()).unwrap();
 
         let mut sim = config.create(Rc::clone(&clock), strat, src);
 
