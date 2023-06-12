@@ -4,10 +4,61 @@ use alator::strategy::StrategyEvent;
 use alator::types::{CashValue, DateTime};
 use time::{Duration, OffsetDateTime};
 
-use crate::acc::{CanTransfer, TransferResult};
 use crate::input::SimDataSource;
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
+
+
+pub trait CanTransfer {
+    fn deposit(&mut self, amount: &f64) -> TransferResult;
+    fn withdraw(&mut self, amount: &f64) -> TransferResult;
+    fn liquidate(&mut self, amount: &f64) -> TransferResult;
+}
+
+pub struct Transfer;
+
+impl Transfer {
+    //Only call from sources that implement liquidate
+    pub fn force(
+        source: &mut impl CanTransfer,
+        dest: &mut impl CanTransfer,
+        amount: &f64,
+    ) -> TransferResult {
+        let res = source.liquidate(amount);
+        match res {
+            TransferResult::Success => {
+                dest.deposit(amount);
+                TransferResult::Success
+            }
+            TransferResult::Failure => TransferResult::Failure,
+        }
+    }
+
+    pub fn from(
+        source: &mut impl CanTransfer,
+        dest: &mut impl CanTransfer,
+        amount: &f64,
+    ) -> TransferResult {
+        let res = source.withdraw(amount);
+        match res {
+            TransferResult::Success => {
+                dest.deposit(amount);
+                TransferResult::Success
+            }
+            TransferResult::Failure => TransferResult::Failure,
+        }
+    }
+
+    pub fn to(dest: &mut impl CanTransfer, amount: &f64) -> TransferResult {
+        dest.deposit(amount);
+        TransferResult::Success
+    }
+}
+
+pub enum TransferResult {
+    Success,
+    Failure,
+}
 
 pub enum Stack<S: InvestmentStrategy, D: SimDataSource> {
     Isa(Isa<S>),
@@ -15,31 +66,6 @@ pub enum Stack<S: InvestmentStrategy, D: SimDataSource> {
     Gia(Gia<S>),
     BankAcc(BankAcc),
     Mortgage(Mortgage<D>),
-}
-
-//Returns (deposit amount, return to client
-//Need to split this for testing
-fn isa_deposit_logic(
-    amount: &f64,
-    threshold: &f64,
-    current_year_deposits: &f64,
-) -> (CashValue, CashValue) {
-    let can_deposit = threshold - current_year_deposits;
-    if can_deposit <= 0.0 {
-        //Over threshold, can't deposit at all
-        (CashValue::from(0.0), CashValue::from(*amount))
-    } else if amount < &can_deposit {
-        //Under threshold, deposit full amount
-        (CashValue::from(*amount), CashValue::from(0.0))
-    } else {
-        //Deposit would take us over the threhold,
-        //deposit as much as possible and return
-        //the rest
-        (
-            CashValue::from(can_deposit),
-            CashValue::from(*amount - can_deposit),
-        )
-    }
 }
 
 //Calculates capital_gains realised in the current tax year
@@ -105,6 +131,69 @@ impl UKAccount {
             UKAccount::SippLifetimeContributionThreshold => 1_073_100.0.into(),
         }
     }
+
+    //Returns (deposit amount, return to client
+    //Need to split this for testing
+    pub fn isa_deposit_logic(
+        amount: &f64,
+        threshold: &f64,
+        current_year_deposits: &f64,
+    ) -> (CashValue, CashValue) {
+        let can_deposit = threshold - current_year_deposits;
+        if can_deposit <= 0.0 {
+            //Over threshold, can't deposit at all
+            (CashValue::from(0.0), CashValue::from(*amount))
+        } else if amount < &can_deposit {
+            //Under threshold, deposit full amount
+            (CashValue::from(*amount), CashValue::from(0.0))
+        } else {
+            //Deposit would take us over the threhold,
+            //deposit as much as possible and return
+            //the rest
+            (
+                CashValue::from(can_deposit),
+                CashValue::from(*amount - can_deposit),
+            )
+        }
+    }
+
+    //Returns (deposit amount, return to client)
+    //Need to split this for testing
+    pub fn sipp_deposit_logic(
+        amount: &f64,
+        current_year_contribution_threshold: &f64,
+        lifetime_contribution_threshold: &f64,
+        current_year_contributions: &f64,
+        lifetime_contributions: &f64,
+    ) -> (CashValue, CashValue) {
+        let can_deposit_year = *current_year_contribution_threshold - *current_year_contributions;
+        let can_deposit_life = *lifetime_contribution_threshold - *lifetime_contributions;
+
+        if can_deposit_year <= 0.0 || can_deposit_life <= 0.0 {
+            //Over at least one threshold, can't deposit at all
+            (CashValue::from(0.0), CashValue::from(*amount))
+        } else if amount < &can_deposit_year && amount < &can_deposit_life {
+            //Under both thresholds, deposit full amount
+            (CashValue::from(*amount), CashValue::from(0.0))
+        } else {
+            //Deposit would take us over at least one threshold
+            //Find the lowest threshold, deposit as much as possible
+            //under that threshold
+            if can_deposit_year > can_deposit_life {
+                (
+                    CashValue::from(can_deposit_life),
+                    CashValue::from(*amount - can_deposit_life),
+                )
+            } else {
+                (
+                    CashValue::from(can_deposit_year),
+                    CashValue::from(*amount - can_deposit_year),
+                )
+            }
+        }
+    }
+
+
 }
 
 #[derive(Clone, Debug)]
@@ -115,6 +204,7 @@ pub struct Isa<S: InvestmentStrategy> {
 
 //Tax year state is controlled from within the simulation.
 impl<S: InvestmentStrategy> Isa<S> {
+
     pub fn zero(&mut self) {
         self.strat.zero();
     }
@@ -144,7 +234,7 @@ impl<S: InvestmentStrategy> Isa<S> {
     //We return the deposit amount because we may need to
     //deposit this elsewhere if we are over the limit
     pub fn deposit_wrapper(&mut self, amount: &f64) -> (CashValue, CashValue) {
-        let (deposit, returned) = isa_deposit_logic(
+        let (deposit, returned) = UKAccount::isa_deposit_logic(
             amount,
             &UKAccount::IsaAnnualDepositThreshold.val(),
             &self.current_tax_year_deposits,
@@ -279,42 +369,6 @@ impl<S: InvestmentStrategy> CanTransfer for Gia<S> {
     }
 }
 
-//Returns (deposit amount, return to client)
-//Need to split this for testing
-fn sipp_deposit_logic(
-    amount: &f64,
-    current_year_contribution_threshold: &f64,
-    lifetime_contribution_threshold: &f64,
-    current_year_contributions: &f64,
-    lifetime_contributions: &f64,
-) -> (CashValue, CashValue) {
-    let can_deposit_year = *current_year_contribution_threshold - *current_year_contributions;
-    let can_deposit_life = *lifetime_contribution_threshold - *lifetime_contributions;
-
-    if can_deposit_year <= 0.0 || can_deposit_life <= 0.0 {
-        //Over at least one threshold, can't deposit at all
-        (CashValue::from(0.0), CashValue::from(*amount))
-    } else if amount < &can_deposit_year && amount < &can_deposit_life {
-        //Under both thresholds, deposit full amount
-        (CashValue::from(*amount), CashValue::from(0.0))
-    } else {
-        //Deposit would take us over at least one threshold
-        //Find the lowest threshold, deposit as much as possible
-        //under that threshold
-        if can_deposit_year > can_deposit_life {
-            (
-                CashValue::from(can_deposit_life),
-                CashValue::from(*amount - can_deposit_life),
-            )
-        } else {
-            (
-                CashValue::from(can_deposit_year),
-                CashValue::from(*amount - can_deposit_year),
-            )
-        }
-    }
-}
-
 //Tax year state is controlled from within the simulation.
 #[derive(Clone, Debug)]
 pub struct Sipp<S: InvestmentStrategy> {
@@ -324,6 +378,7 @@ pub struct Sipp<S: InvestmentStrategy> {
 }
 
 impl<S: InvestmentStrategy> Sipp<S> {
+
     pub fn zero(&mut self) {
         self.strat.zero();
     }
@@ -351,7 +406,7 @@ impl<S: InvestmentStrategy> Sipp<S> {
     }
 
     pub fn deposit_wrapper(&mut self, amount: &f64) -> (CashValue, CashValue) {
-        let (deposit, returned) = sipp_deposit_logic(
+        let (deposit, returned) = UKAccount::sipp_deposit_logic(
             amount,
             &UKAccount::SippAnnualContributionThreshold.val(),
             &UKAccount::SippLifetimeContributionThreshold.val(),
@@ -603,44 +658,44 @@ mod tests {
 
     use crate::input::{daily_data_generator_static, HashMapSourceSimBuilder};
 
-    use super::{calculate_capital_gains, isa_deposit_logic, sipp_deposit_logic};
+    use super::{calculate_capital_gains, UKAccount};
     use super::{BankAcc, LoanEvent, Mortgage};
 
     #[test]
     fn test_that_isa_threshold() {
         //TODO: this should be tested with mocks
-        let res = isa_deposit_logic(&100.0, &50.0, &0.0);
+        let res = UKAccount::isa_deposit_logic(&100.0, &50.0, &0.0);
         assert!(*res.0 == 50.0 && *res.1 == 50.0);
 
-        let res1 = isa_deposit_logic(&10.0, &50.0, &0.0);
+        let res1 = UKAccount::isa_deposit_logic(&10.0, &50.0, &0.0);
         assert!(*res1.0 == 10.0 && *res1.1 == 0.0);
 
-        let res2 = isa_deposit_logic(&10.0, &50.0, &40.0);
+        let res2 = UKAccount::isa_deposit_logic(&10.0, &50.0, &40.0);
         assert!(*res2.0 == 10.0 && *res2.1 == 0.0);
 
-        let res3 = isa_deposit_logic(&10.0, &50.0, &45.0);
+        let res3 = UKAccount::isa_deposit_logic(&10.0, &50.0, &45.0);
         assert!(*res3.0 == 5.0 && *res3.1 == 5.0);
     }
 
     #[test]
     fn test_that_sipp_threshold() {
         //TODO: this should be tested with mocks
-        let res = sipp_deposit_logic(&100.0, &50.0, &50.0, &0.0, &0.0);
+        let res = UKAccount::sipp_deposit_logic(&100.0, &50.0, &50.0, &0.0, &0.0);
         assert!(*res.0 == 50.0 && *res.1 == 50.0);
 
-        let res1 = sipp_deposit_logic(&10.0, &50.0, &50.0, &0.0, &0.0);
+        let res1 = UKAccount::sipp_deposit_logic(&10.0, &50.0, &50.0, &0.0, &0.0);
         assert!(*res1.0 == 10.0 && *res1.1 == 0.0);
 
-        let res2 = sipp_deposit_logic(&10.0, &50.0, &50.0, &40.0, &40.0);
+        let res2 = UKAccount::sipp_deposit_logic(&10.0, &50.0, &50.0, &40.0, &40.0);
         assert!(*res2.0 == 10.0 && *res2.1 == 0.0);
 
-        let res3 = sipp_deposit_logic(&10.0, &50.0, &50.0, &45.0, &45.0);
+        let res3 = UKAccount::sipp_deposit_logic(&10.0, &50.0, &50.0, &45.0, &45.0);
         assert!(*res3.0 == 5.0 && *res3.1 == 5.0);
 
-        let res4 = sipp_deposit_logic(&10.0, &50.0, &100.0, &45.0, &45.0);
+        let res4 = UKAccount::sipp_deposit_logic(&10.0, &50.0, &100.0, &45.0, &45.0);
         assert!(*res4.0 == 5.0 && *res4.1 == 5.0);
 
-        let res5 = sipp_deposit_logic(&10.0, &100.0, &50.0, &45.0, &45.0);
+        let res5 = UKAccount::sipp_deposit_logic(&10.0, &100.0, &50.0, &45.0, &45.0);
         assert!(*res5.0 == 5.0 && *res5.1 == 5.0);
     }
 

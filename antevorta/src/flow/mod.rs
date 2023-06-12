@@ -1,12 +1,11 @@
 use alator::types::{CashValue, DateTime};
 
-use crate::acc::CanTransfer;
+use crate::stack::CanTransfer;
 use crate::input::{HashMapSourceSim, SimDataSource};
 use crate::schedule::Schedule;
 use crate::strat::InvestmentStrategy;
-
-use super::tax::TaxPeriod;
-use super::UKSimulationState;
+use crate::tax::uk::TaxPeriod;
+use crate::sim::uk::UKSimulationState;
 
 trait WillFlow<S: InvestmentStrategy> {
     //Check should only deposit funds into cash. We need to track deposits to other accounts so it

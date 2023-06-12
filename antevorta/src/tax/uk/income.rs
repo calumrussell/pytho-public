@@ -283,7 +283,7 @@ impl DividendTax {
 mod tests {
     use super::personal_savings_allowance;
 
-    use crate::country::uk::tax::UKTaxConfig;
+    use crate::tax::uk::UKTaxConfig;
 
     #[test]
     fn test_savings_allowance_output() {
