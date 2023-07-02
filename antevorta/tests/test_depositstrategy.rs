@@ -8,7 +8,7 @@ use antevorta::input::build_hashmapsource_with_quotes_with_inflation;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use antevorta::country::uk::Config;
+use antevorta::config::uk::UKSimConfig;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 
@@ -88,7 +88,7 @@ fn sim_depositstrategy() {
         ]
     }"#;
 
-    let mut sim = Config::parse(config)
+    let mut sim = UKSimConfig::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
     //The value of the bank account should be equal to the emergency fund balance

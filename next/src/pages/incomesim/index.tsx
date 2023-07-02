@@ -32,7 +32,11 @@ import { HistogramChart, StackedBarChart } from "@Components/charts";
 
 import { InfoHeader } from "@Containers/incomesim/infoheader";
 import { YearlyTable } from "@Containers/incomesim/yearlytable";
-import { initialState, reducer, convertStateToSnakeCase } from "@Containers/incomesim/reducer";
+import {
+  initialState,
+  reducer,
+  convertStateToSnakeCase,
+} from "@Containers/incomesim/reducer";
 
 interface IncomeSimProps {
   userKey: string | null;

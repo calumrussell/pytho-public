@@ -123,6 +123,8 @@ const Inner = ({ portfolios, state, dispatch }: BuildProps) => {
   const savePortfolioToServer = async (
     ev: React.MouseEvent<HTMLButtonElement>
   ) => {
+    ev.preventDefault();
+
     const payload = {
       portfolio: state,
       name: portfolioName,

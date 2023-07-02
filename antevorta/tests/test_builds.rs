@@ -5,22 +5,22 @@ We do this here rather than in config because of the hard dependency on needing
 a complete config.
 */
 
-use alator::exchange::DefaultExchangeBuilder;
-use antevorta::country::uk::Config;
-use antevorta::input::{build_hashmapsource_with_quotes_with_inflation, HashMapSourceSim};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use std::collections::HashMap;
-
+use alator::exchange::DefaultExchangeBuilder;
 use alator::broker::Quote;
 use alator::clock::{Clock, ClockBuilder};
 use alator::input::QuotesHashMap;
 use alator::sim::SimulatedBrokerBuilder;
 use alator::types::PortfolioAllocation;
+use std::rc::Rc;
+
+use antevorta::config::uk::UKSimConfig;
+use antevorta::input::{build_hashmapsource_with_quotes_with_inflation, HashMapSourceSim};
 use antevorta::output::UKSimulationOutput;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
-use std::rc::Rc;
 
 fn setup() -> (Clock, StaticInvestmentStrategy, HashMapSourceSim) {
     let clock = ClockBuilder::with_length_in_days(1, 100)
@@ -86,7 +86,7 @@ fn test_that_build_fails_without_all_stacks() {
         }"#;
 
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
@@ -139,7 +139,7 @@ fn test_that_percent_of_income_expense_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
@@ -185,7 +185,7 @@ fn test_that_static_growth_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
@@ -229,7 +229,7 @@ fn test_that_stack_creation_without_value_fails() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
     while clock.borrow().has_next() {
@@ -284,7 +284,7 @@ fn test_build_that_orders_income_expense_before_income() {
         }
     "#;
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 
@@ -338,7 +338,7 @@ fn test_that_mortgage_can_build() {
             ]
         }"#;
     let (clock, strat, sim_data) = setup();
-    let mut sim = Config::parse(data)
+    let mut sim = UKSimConfig::parse(data)
         .unwrap()
         .create(Rc::clone(&clock), strat, sim_data);
 

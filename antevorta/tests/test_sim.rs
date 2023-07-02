@@ -6,7 +6,7 @@ use antevorta::input::build_hashmapsource_random;
 use antevorta::output::UKSimulationOutput;
 use std::rc::Rc;
 
-use antevorta::country::uk::Config;
+use antevorta::config::uk::UKSimConfig;
 use antevorta::schedule::Schedule;
 use antevorta::strat::StaticInvestmentStrategy;
 
@@ -70,7 +70,7 @@ fn sim_test() {
         ]
     }"#;
 
-    let mut sim = Config::parse(config)
+    let mut sim = UKSimConfig::parse(config)
         .unwrap()
         .create(Rc::clone(&clock), strat, src);
 

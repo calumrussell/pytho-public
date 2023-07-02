@@ -4,7 +4,8 @@ use alator::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{country::uk::UKSimulationState, strat::InvestmentStrategy};
+use crate::sim::uk::UKSimulationState;
+use crate::strat::InvestmentStrategy;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UKSimulationOutput {

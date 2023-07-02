@@ -67,10 +67,10 @@ export const Row = ({ values, title, isSubSection, formattingFunc }) => {
       <FirstCell>
         {isSubSection ? (
           <DefaultHorizontalSpacer>
-            <Text light>{title}</Text>
+            <Text light small>{title}</Text>
           </DefaultHorizontalSpacer>
         ) : (
-          <Text>{title}</Text>
+          <Text light small>{title}</Text>
         )}
       </FirstCell>
       {values &&
@@ -88,6 +88,24 @@ Row.propTypes = {
   title: PropTypes.string.isRequired,
   isSubSection: PropTypes.bool,
   formattingFunc: PropTypes.func,
+};
+
+export const StaticTable = ({ headerRows, bodyRows }) => {
+  return (
+    <TableWrapper>
+      <div>
+        <Table>
+          <thead>{headerRows}</thead>
+          <tbody>{bodyRows}</tbody>
+        </Table>
+      </div>
+    </TableWrapper>
+  )
+}
+
+StaticTable.propTypes = {
+  headerRows: PropTypes.arrayOf(PropTypes.node).isRequired,
+  bodyRows: PropTypes.arrayOf(PropTypes.node).isRequired,
 };
 
 export const ScrollableTable = ({ headerRows, bodyRows }) => {

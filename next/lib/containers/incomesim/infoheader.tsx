@@ -9,6 +9,7 @@ import {
   AntevortaTypes,
 } from "@Common/index";
 import { dateConverter } from "@Common/index";
+import { StaticTable, Row } from "@Components/table";
 
 interface InfoHeaderProps {
   runs: number;
@@ -87,68 +88,21 @@ export const InfoHeader = ({
 
   return (
     <React.Fragment>
-      <RowWrapper>
-        <NumberWithTitle
-          title={"Sim Start"}
-          number={dateConverter(data_first_date)}
-        />
-        <NumberWithTitle
-          title={"Sim End"}
-          number={dateConverter(data_last_date)}
-        />
-      </RowWrapper>
-      <RowWrapper>
-        <NumberWithTitle
-          title={"Sample Start"}
-          number={dateConverter(sample_start)}
-        />
-        <NumberWithTitle
-          title={"Sample End"}
-          number={dateConverter(sample_end)}
-        />
-      </RowWrapper>
-      <RowWrapper>
-        <NumberWithTitle
-          title={"Min End Value"}
-          number={strConverterCurr(total_min)}
-        />
-        <NumberWithTitle
-          title={"Avg End Value"}
-          number={strConverterCurr(total_avg)}
-        />
-        <NumberWithTitle
-          title={"Max End Value"}
-          number={strConverterCurr(total_max)}
-        />
-      </RowWrapper>
-      <RowWrapper>
-        <NumberWithTitle title={"Min Vol"} number={strConverterMult(min_vol)} />
-        <NumberWithTitle title={"Avg Vol"} number={strConverterMult(avg_vol)} />
-        <NumberWithTitle title={"Max Vol"} number={strConverterMult(max_vol)} />
-      </RowWrapper>
-      <RowWrapper>
-        <NumberWithTitle
-          title={"Min CAGR"}
-          number={strConverterMult(min_cagr)}
-        />
-        <NumberWithTitle
-          title={"Avg CAGR"}
-          number={strConverterMult(avg_cagr)}
-        />
-        <NumberWithTitle
-          title={"Max CAGR"}
-          number={strConverterMult(max_cagr)}
-        />
-      </RowWrapper>
-      <RowWrapper>
-        <NumberWithTitle title={"Min MDD"} number={strConverterMult(min_mdd)} />
-        <NumberWithTitle title={"Avg MDD"} number={strConverterMult(avg_mdd)} />
-        <NumberWithTitle title={"Max MDD"} number={strConverterMult(max_mdd)} />
-        <NumberWithTitle
-          title={"Avg MDD duration"}
-          number={strConverter(average_dd_length)}
-        />
-      </RowWrapper>
+      <StaticTable 
+        headerRows={[<Row values={['Sim Start', 'Sim End']} title="" />]} 
+        bodyRows={[<Row values={[dateConverter(data_first_date), dateConverter(data_last_date)]} title="" />]} />
+      <StaticTable 
+        headerRows={[<Row values={['Sample Start', 'SampleEnd']} title="" />]} 
+        bodyRows={[<Row values={[dateConverter(sample_start), dateConverter(sample_end)]} title="" />]} />
+      <StaticTable 
+        headerRows={[<Row values={['Min', 'Avg', 'Max']} title="" />]} 
+        bodyRows={[
+          <Row values={[strConverterCurr(total_min), strConverterCurr(total_avg), strConverterCurr(total_max)]} title="End Value" />,
+          <Row values={[strConverterMult(min_vol), strConverterMult(avg_vol), strConverterMult(max_vol)]} title="Vol %" />,
+          <Row values={[strConverterMult(min_cagr), strConverterMult(avg_cagr), strConverterMult(max_cagr)]} title="CAGR %" />,
+          <Row values={[strConverterMult(min_mdd), strConverterMult(avg_mdd), strConverterMult(max_mdd)]} title="MDD %" />,
+          <Row values={["", strConverter(average_dd_length), ""]} title="MDD Duration" />,
+        ]} />
     </React.Fragment>
   );
 };

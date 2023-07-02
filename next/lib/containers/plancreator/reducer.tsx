@@ -1,4 +1,4 @@
-import { AntevortaTypes } from '@Common/index';
+import { AntevortaTypes } from "@Common/index";
 
 export const initialState: AntevortaTypes.FinancialPlan = {
   flows: [] as AntevortaTypes.Flow[],
@@ -108,4 +108,3 @@ export const reducer = (
     }
   }
 };
-

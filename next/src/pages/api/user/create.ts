@@ -1,7 +1,6 @@
 import prisma from "@Root/lib/prisma";
 import { withSessionRoute } from "@Root/lib/session";
 import { NextApiRequest, NextApiResponse } from "next";
-import crypto from "crypto";
 
 export default withSessionRoute(createRoute);
 
@@ -11,14 +10,7 @@ async function createRoute(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const userKey = crypto.randomBytes(15).toString("hex");
-    const user = await prisma.api_user.create({
-      data: {
-        user_key: userKey,
-      },
-    });
-
-    //Login newly-created user
+    const user = await prisma.api_user.create({ data: {} });
     req.session.user = {
       userKey: user.user_key,
     };

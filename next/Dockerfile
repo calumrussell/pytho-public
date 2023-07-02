@@ -1,7 +1,7 @@
 FROM node:18
 
 WORKDIR /app
-COPY . .
+COPY ./ .
 RUN yarn install
 ENV NEXT_TELEMETRY_DISABLED 1
 
