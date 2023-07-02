@@ -89,19 +89,19 @@ export const InfoHeader = ({
   return (
     <React.Fragment>
       <StaticTable 
-        headerRows={[<Row values={['Sim Start', 'Sim End']} title="" />]} 
-        bodyRows={[<Row values={[dateConverter(data_first_date), dateConverter(data_last_date)]} title="" />]} />
+        headerRows={[<Row key={0} values={['Sim Start', 'Sim End']} title="" />]} 
+        bodyRows={[<Row key={1} values={[dateConverter(data_first_date), dateConverter(data_last_date)]} title="" />]} />
       <StaticTable 
-        headerRows={[<Row values={['Sample Start', 'SampleEnd']} title="" />]} 
-        bodyRows={[<Row values={[dateConverter(sample_start), dateConverter(sample_end)]} title="" />]} />
+        headerRows={[<Row key={2} values={['Sample Start', 'SampleEnd']} title="" />]} 
+        bodyRows={[<Row key={3} values={[dateConverter(sample_start), dateConverter(sample_end)]} title="" />]} />
       <StaticTable 
-        headerRows={[<Row values={['Min', 'Avg', 'Max']} title="" />]} 
+        headerRows={[<Row key={4} values={['Min', 'Avg', 'Max']} title="" />]} 
         bodyRows={[
-          <Row values={[strConverterCurr(total_min), strConverterCurr(total_avg), strConverterCurr(total_max)]} title="End Value" />,
-          <Row values={[strConverterMult(min_vol), strConverterMult(avg_vol), strConverterMult(max_vol)]} title="Vol %" />,
-          <Row values={[strConverterMult(min_cagr), strConverterMult(avg_cagr), strConverterMult(max_cagr)]} title="CAGR %" />,
-          <Row values={[strConverterMult(min_mdd), strConverterMult(avg_mdd), strConverterMult(max_mdd)]} title="MDD %" />,
-          <Row values={["", strConverter(average_dd_length), ""]} title="MDD Duration" />,
+          <Row key={5} values={[strConverterCurr(total_min), strConverterCurr(total_avg), strConverterCurr(total_max)]} title="End Value" />,
+          <Row key={6} values={[strConverterMult(min_vol), strConverterMult(avg_vol), strConverterMult(max_vol)]} title="Vol %" />,
+          <Row key={7} values={[strConverterMult(min_cagr), strConverterMult(avg_cagr), strConverterMult(max_cagr)]} title="CAGR %" />,
+          <Row key={8} values={[strConverterMult(min_mdd), strConverterMult(avg_mdd), strConverterMult(max_mdd)]} title="MDD %" />,
+          <Row key={9} values={["", strConverter(average_dd_length), ""]} title="MDD Duration" />,
         ]} />
     </React.Fragment>
   );
